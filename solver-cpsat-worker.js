@@ -179,6 +179,64 @@ function compareTuple(a, b) {
   return 0;
 }
 
+function mixSeed(...values) {
+  let seed = 2166136261;
+  for (const value of values) {
+    const text = String(value);
+    for (let i = 0; i < text.length; i++) {
+      seed ^= text.charCodeAt(i);
+      seed = Math.imul(seed, 16777619);
+    }
+    seed ^= 0x9e3779b9;
+    seed = Math.imul(seed, 2246822507);
+  }
+  return seed >>> 0;
+}
+
+function variantHash(seed, ...values) {
+  let hash = seed >>> 0;
+  for (const value of values) {
+    hash = mixSeed(hash, value);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 2246822507);
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 3266489909);
+  hash ^= hash >>> 16;
+  return hash >>> 0;
+}
+
+function orderItemsForVariant(items, layoutVariant, inputSeed) {
+  if (layoutVariant <= 0 || items.length < 2) return items;
+  const seed = mixSeed(inputSeed || 1, layoutVariant, items.length);
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      key: variantHash(seed, item.id, item.length, item.width, item.typeIndex, item.itemIndex, index)
+    }))
+    .sort((a, b) => a.key - b.key || a.index - b.index)
+    .map((entry) => entry.item);
+}
+
+function layoutSignature(placed) {
+  return placed
+    .map((item) => [
+      item.id,
+      Math.round(item.x),
+      Math.round(item.y),
+      Math.round(item.packLength),
+      Math.round(item.packWidth),
+      item.rotated ? 1 : 0
+    ].join(":"))
+    .sort()
+    .join("|");
+}
+
+function usedPackLength(placed) {
+  return placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+}
+
 function greedyUpperBound(items, trailer, allowRotate) {
   const ordered = items.slice().sort((a, b) =>
     b.packArea - a.packArea ||
@@ -593,7 +651,7 @@ function dynamicRowsRepack(sources, trailer, allowRotate, gap, label) {
   };
 }
 
-function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap) {
+function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap, variantSeed = 0) {
   if (trailerPlaced.length < 2) {
     return {
       label: "CP-SAT + kompresja",
@@ -610,29 +668,55 @@ function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap) {
   ];
 
   const fallback = { label: "CP-SAT + kompresja", placed: compactPlacedItems(base, trailer) };
-  let best = null;
-  let bestScore = null;
+  const candidates = [];
+  const signatures = new Set();
+  const addCandidate = (candidate) => {
+    if (!candidate || candidate.placed.length !== base.length) return;
+    const normalized = {
+      ...candidate,
+      placed: candidate.placed.map((item) => ({ ...item }))
+    };
+    const signature = layoutSignature(normalized.placed);
+    if (signatures.has(signature)) return;
+    signatures.add(signature);
+    normalized.score = layoutScoreTuple(normalized.placed, trailer, gap);
+    candidates.push(normalized);
+  };
+  addCandidate(fallback);
   const dynamicRows = dynamicRowsRepack(base, trailer, allowRotate, gap, "CP-SAT + dynamiczne rzedy pelnej szerokosci");
-  if (dynamicRows) {
-    best = dynamicRows;
-    bestScore = layoutScoreTuple(dynamicRows.placed, trailer, gap);
-  }
+  addCandidate(dynamicRows);
   for (const order of orders) {
     for (const candidate of [
       skylineRepack(order.items, trailer, allowRotate, gap, `${order.label} skyline`),
       maxRectsRepack(order.items, trailer, allowRotate, gap, `${order.label} max-rects`)
     ]) {
-      if (!candidate) continue;
-      const score = layoutScoreTuple(candidate.placed, trailer, gap);
-      if (!best || compareTuple(score, bestScore) < 0) {
-        best = candidate;
-        bestScore = score;
-      }
+      addCandidate(candidate);
     }
   }
-  if (!best) best = fallback;
-  best.placed.sort((a, b) => a.x - b.x || a.y - b.y);
-  return best;
+  if (candidates.length === 0) addCandidate(fallback);
+  candidates.sort((a, b) => compareTuple(a.score, b.score));
+  const best = candidates[0] || fallback;
+
+  let selected = best;
+  if (variantSeed > 0 && candidates.length > 1) {
+    const bestUsedLength = usedPackLength(best.placed);
+    const bestPocketPenalty = layoutPocketPenalty(best.placed, trailer);
+    let variantPool = candidates.filter((candidate) => {
+      const candidateUsedLength = usedPackLength(candidate.placed);
+      const candidatePocketPenalty = layoutPocketPenalty(candidate.placed, trailer);
+      return (
+        candidate.placed.length === best.placed.length &&
+        candidateUsedLength <= bestUsedLength + 1200 &&
+        candidatePocketPenalty <= bestPocketPenalty + trailer.width * 1200
+      );
+    });
+    if (variantPool.length < 2) variantPool = candidates.slice(0, Math.min(6, candidates.length));
+    selected = variantPool[variantSeed % variantPool.length] || best;
+  }
+
+  const selectedPlan = selected || best;
+  selectedPlan.placed.sort((a, b) => a.x - b.x || a.y - b.y);
+  return selectedPlan;
 }
 
 function buildTrailerSummary(trailerPlaced, trailer, trailerIndex, strategyLabel, method) {
@@ -695,7 +779,9 @@ function solveCpSatLayout(solver, payload, requestId) {
   };
   const gap = Math.floor(clampNumber(payload.gap, 0, 0));
   const allowRotate = payload.allowRotate !== false;
-  const items = expandItems(payload.rows || [], gap);
+  const layoutVariant = Math.max(0, Math.floor(payload.layoutVariant || 0));
+  const expandedItems = expandItems(payload.rows || [], gap);
+  const items = orderItemsForVariant(expandedItems, layoutVariant, payload.inputSeed || 1);
   const totalArea = items.reduce((sum, item) => sum + item.packArea, 0);
   const lowerBound = Math.max(1, Math.ceil(totalArea / Math.max(1, trailer.length * trailer.width)));
   const upperBound = greedyUpperBound(items, trailer, allowRotate);
@@ -784,8 +870,18 @@ function solveCpSatLayout(solver, payload, requestId) {
     }
   }
 
+  const variantPositionWeights = items.map((item, index) => {
+    if (layoutVariant <= 0) return { x: 4, y: 2 };
+    const hash = variantHash(layoutVariant, payload.inputSeed || 1, item.id, index);
+    return {
+      x: 1 + (hash % 7),
+      y: 1 + ((hash >>> 8) % 5)
+    };
+  });
+  const maxXWeight = variantPositionWeights.reduce((max, weight) => Math.max(max, weight.x), 0);
+  const maxYWeight = variantPositionWeights.reduce((max, weight) => Math.max(max, weight.y), 0);
   const compactBound =
-    items.length * (trailer.length * 4 + trailer.width * 2) +
+    items.length * (trailer.length * maxXWeight + trailer.width * maxYWeight) +
     upperBound * trailer.width +
     1;
   const lengthWeight = compactBound + 1;
@@ -794,8 +890,8 @@ function solveCpSatLayout(solver, payload, requestId) {
     ...used.map((varItem) => varItem.times(trailerWeight)),
     ...usedLength.map((varItem) => varItem.times(lengthWeight)),
     ...usedWidth,
-    ...x.map((varItem) => varItem.times(4)),
-    ...y.map((varItem) => varItem.times(2))
+    ...x.map((varItem, index) => varItem.times(variantPositionWeights[index].x)),
+    ...y.map((varItem, index) => varItem.times(variantPositionWeights[index].y))
   ];
   model.minimize(linearSum(objectiveTerms));
 
@@ -845,7 +941,8 @@ function solveCpSatLayout(solver, payload, requestId) {
     }
     trailerPlaced.sort((a, b) => a.x - b.x || a.y - b.y);
     const trailerIndex = trailers.length + 1;
-    const repacked = repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap);
+    const repackVariantSeed = layoutVariant > 0 ? layoutVariant + trailerIndex * 997 : 0;
+    const repacked = repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap, repackVariantSeed);
     const strategyLabel = result.status === CpSolverStatus.OPTIMAL
       ? `OR-Tools CP-SAT exact, ${repacked.label}`
       : `OR-Tools CP-SAT feasible, ${repacked.label}`;
@@ -886,7 +983,7 @@ function solveCpSatLayout(solver, payload, requestId) {
     method: "WASM CP-SAT + dynamic rows/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
-    layoutVariant: Math.max(0, Math.floor(payload.layoutVariant || 0)),
+    layoutVariant,
     searchQuality: "deep",
     searchElapsedMs: nowMs() - startedAt,
     status: statusName(result.status),

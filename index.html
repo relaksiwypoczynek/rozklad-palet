@@ -1244,7 +1244,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.18";
+    const APP_VERSION = "2026-06-05.01";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -4945,6 +4945,7 @@
           compactLength: state.compactLength,
           searchQuality: quality,
           layoutVariant: state.layoutVariant,
+          inputSeed: seed,
           maxTimeSeconds: Math.max(1, Math.floor(config.budgetMs / 1000))
         };
         try {
