@@ -1,0 +1,184 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Rozklad palet - verify</title>
+<pre id="out">RUNNING</pre>
+<script type="module">
+  const trailer = { length: 13620, width: 2480 };
+  const gap = 10;
+
+  const cases = [
+    {
+      name: "preferred_pair_only",
+      maxTimeSeconds: 20,
+      rows: [
+        { id: 1, name: "115x170", length: 1150, width: 1700, quantity: 6, color: "#0f766e" },
+        { id: 2, name: "75x105", length: 750, width: 1050, quantity: 6, color: "#b45309" }
+      ],
+      expect: { trailerCountMax: 1, preferredPairsMin: 6, packUsedLengthMax: 6960 }
+    },
+    {
+      name: "mixed_phone_case",
+      maxTimeSeconds: 20,
+      rows: [
+        { id: 1, name: "115x170", length: 1150, width: 1700, quantity: 4, color: "#0f766e" },
+        { id: 2, name: "100x115", length: 1000, width: 1150, quantity: 6, color: "#7c3aed" },
+        { id: 3, name: "95x135", length: 950, width: 1350, quantity: 4, color: "#be123c" },
+        { id: 4, name: "75x105", length: 750, width: 1050, quantity: 6, color: "#b45309" },
+        { id: 5, name: "55x105", length: 550, width: 1050, quantity: 8, color: "#15803d" }
+      ],
+      expect: { trailerCountMax: 1, preferredPairsMin: 4 }
+    }
+  ];
+
+  function overlap(aStart, aSize, bStart, bSize) {
+    return Math.max(0, Math.min(aStart + aSize, bStart + bSize) - Math.max(aStart, bStart));
+  }
+
+  function intersects(a, b) {
+    return a.x < b.x + b.packLength &&
+      a.x + a.packLength > b.x &&
+      a.y < b.y + b.packWidth &&
+      a.y + a.packWidth > b.y;
+  }
+
+  function sides(item) {
+    return [item.originalLength || item.length, item.originalWidth || item.width].sort((a, b) => a - b);
+  }
+
+  function matches(item, sideA, sideB) {
+    const actual = sides(item);
+    const expected = [sideA, sideB].sort((a, b) => a - b);
+    return Math.abs(actual[0] - expected[0]) <= 2 && Math.abs(actual[1] - expected[1]) <= 2;
+  }
+
+  function preferredPairCount(placed) {
+    const wide = placed.filter((item) =>
+      matches(item, 1150, 1700) &&
+      Math.abs(item.packLength - 1160) <= 2 &&
+      Math.abs(item.packWidth - 1710) <= 2
+    );
+    const narrow = placed.filter((item) =>
+      matches(item, 750, 1050) &&
+      Math.abs(item.packLength - 1060) <= 2 &&
+      Math.abs(item.packWidth - 760) <= 2
+    );
+    const used = new Set();
+    let count = 0;
+    for (const big of wide) {
+      const pair = narrow.find((small) => {
+        if (used.has(small.id)) return false;
+        const adjacent = Math.abs(big.y + big.packWidth - small.y) <= 2 ||
+          Math.abs(small.y + small.packWidth - big.y) <= 2;
+        return adjacent && overlap(big.x, big.packLength, small.x, small.packLength) >= 1000;
+      });
+      if (pair) {
+        used.add(pair.id);
+        count++;
+      }
+    }
+    return count;
+  }
+
+  function validatePlan(plan, testCase) {
+    const errors = [];
+    if (plan.trailerCount > testCase.expect.trailerCountMax) {
+      errors.push(`too many trailers: ${plan.trailerCount}`);
+    }
+    if (testCase.expect.packUsedLengthMax && plan.packUsedLength > testCase.expect.packUsedLengthMax) {
+      errors.push(`too long: ${plan.packUsedLength}`);
+    }
+    if (plan.placed.length !== testCase.rows.reduce((sum, row) => sum + row.quantity, 0)) {
+      errors.push(`wrong placed count: ${plan.placed.length}`);
+    }
+    for (const item of plan.placed) {
+      if (item.x < 0 || item.y < 0 || item.x + item.packLength > trailer.length || item.y + item.packWidth > trailer.width) {
+        errors.push(`out of bounds: ${item.name} ${item.x},${item.y}`);
+      }
+    }
+    for (const trailerPlan of plan.trailers) {
+      const placed = trailerPlan.placed;
+      for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++) {
+          if (intersects(placed[i], placed[j])) {
+            errors.push(`collision: ${placed[i].name} / ${placed[j].name}`);
+          }
+        }
+      }
+    }
+    const pairCount = preferredPairCount(plan.placed);
+    if (pairCount < testCase.expect.preferredPairsMin) {
+      errors.push(`preferred pairs: ${pairCount}`);
+    }
+    return {
+      errors,
+      pairCount
+    };
+  }
+
+  function solve(testCase) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker("../solver-cpsat-worker.js?v=verify", { type: "module" });
+      const requestId = `${Date.now()}-${Math.random()}`;
+      worker.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.requestId !== requestId) return;
+        if (data.type === "progress") return;
+        worker.terminate();
+        if (data.type === "result") resolve(data.plan);
+        else reject(new Error(data.message || "worker error"));
+      };
+      worker.onerror = (event) => {
+        worker.terminate();
+        reject(new Error(event.message || "worker error"));
+      };
+      worker.postMessage({
+        requestId,
+        payload: {
+          rows: testCase.rows,
+          trailer,
+          gap,
+          allowRotate: true,
+          compactLength: true,
+          searchQuality: "deep",
+          layoutVariant: 0,
+          maxTimeSeconds: testCase.maxTimeSeconds
+        }
+      });
+    });
+  }
+
+  const startedAt = performance.now();
+  const results = [];
+  for (const testCase of cases) {
+    const caseStartedAt = performance.now();
+    try {
+      const plan = await solve(testCase);
+      const validation = validatePlan(plan, testCase);
+      results.push({
+        name: testCase.name,
+        ok: validation.errors.length === 0,
+        errors: validation.errors,
+        pairCount: validation.pairCount,
+        trailerCount: plan.trailerCount,
+        packUsedLength: plan.packUsedLength,
+        method: plan.method,
+        strategyLabel: plan.strategyLabel,
+        elapsedMs: Math.round(performance.now() - caseStartedAt)
+      });
+    } catch (error) {
+      results.push({
+        name: testCase.name,
+        ok: false,
+        errors: [error.message || String(error)],
+        elapsedMs: Math.round(performance.now() - caseStartedAt)
+      });
+    }
+  }
+
+  const ok = results.every((result) => result.ok);
+  document.querySelector("#out").textContent = JSON.stringify({
+    ok,
+    elapsedMs: Math.round(performance.now() - startedAt),
+    results
+  }, null, 2);
+</script>
