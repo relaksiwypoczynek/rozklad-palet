@@ -676,6 +676,12 @@
       min-width: 0;
     }
 
+    .status-line span:last-child {
+      min-width: 0;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
     .status-dot {
       width: 9px;
       height: 9px;
@@ -719,7 +725,8 @@
       z-index: 3;
       display: none;
       place-items: start center;
-      padding-top: 34px;
+      box-sizing: border-box;
+      padding: 34px 12px 0;
       background: rgba(248, 250, 252, 0.72);
       pointer-events: none;
     }
@@ -729,7 +736,9 @@
       flex-direction: column;
       align-items: stretch;
       gap: 8px;
-      width: min(360px, calc(100% - 32px));
+      box-sizing: border-box;
+      width: min(340px, 100%);
+      max-width: 100%;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #ffffff;
@@ -741,16 +750,20 @@
 
     .calc-row {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 9px;
       min-width: 0;
     }
 
     .calc-row span:last-child {
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1.25;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .calc-row .status-spinner {
+      margin-top: 2px;
     }
 
     .calc-progress {
@@ -774,6 +787,7 @@
       font-weight: 600;
       line-height: 1.25;
       font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
     }
 
     body.is-calculating .calc-overlay {
@@ -987,6 +1001,15 @@
 
       .canvas-shell {
         min-height: 250px;
+      }
+
+      .calc-overlay {
+        padding: 24px 8px 0;
+      }
+
+      .calc-badge {
+        width: 100%;
+        padding: 9px 10px;
       }
 
       canvas {
@@ -1203,7 +1226,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.8";
+    const APP_VERSION = "2026-06-04.9";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
