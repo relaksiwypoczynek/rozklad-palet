@@ -1229,7 +1229,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.16";
+    const APP_VERSION = "2026-06-04.17";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1693,6 +1693,7 @@
     };
 
     let currentPlan = null;
+    let displayedPlan = null;
     let drawState = null;
     let hoveredId = null;
     let recalcTimer = null;
@@ -4963,6 +4964,7 @@
     }
 
     function drawDeck(plan) {
+      displayedPlan = plan;
       setCanvasSizeForPlan(plan);
       const { ctx, width, height } = setupCanvasSize();
       ctx.clearRect(0, 0, width, height);
@@ -5004,7 +5006,7 @@
         }
       }
       ctx.restore();
-      drawState = { layouts, trailer, width, height };
+      drawState = { layouts, trailer, width, height, plan };
     }
 
     function drawGrid(ctx, layout) {
@@ -5087,13 +5089,14 @@
     }
 
     function hitTestPallet(clientX, clientY) {
-      if (!currentPlan || !drawState) return null;
+      const plan = drawState?.plan || displayedPlan || currentPlan;
+      if (!plan || !drawState) return null;
       const rect = el.canvas.getBoundingClientRect();
       const px = clientX - rect.left;
       const py = clientY - rect.top;
 
-      for (let i = currentPlan.placed.length - 1; i >= 0; i--) {
-        const pallet = currentPlan.placed[i];
+      for (let i = plan.placed.length - 1; i >= 0; i--) {
+        const pallet = plan.placed[i];
         const layout = drawState.layouts.find((item) => item.index === pallet.trailerIndex);
         if (!layout) continue;
         const lengthPos = (py - layout.oy) / layout.scale;
@@ -5111,10 +5114,11 @@
     }
 
     function showTooltip(hit) {
+      const plan = drawState?.plan || displayedPlan || currentPlan;
       if (!hit) {
         hoveredId = null;
         el.tooltip.style.display = "none";
-        if (currentPlan) drawDeck(currentPlan);
+        if (plan) drawDeck(plan);
         return;
       }
 
@@ -5134,7 +5138,7 @@
       el.tooltip.style.left = `${Math.max(8, left)}px`;
       el.tooltip.style.top = `${Math.max(8, top)}px`;
       el.tooltip.style.display = "block";
-      drawDeck(currentPlan);
+      if (plan) drawDeck(plan);
     }
 
     async function exportCsv() {
@@ -5313,7 +5317,8 @@
       el.canvasShell.addEventListener("pointercancel", stopCanvasPanning);
 
       window.addEventListener("resize", () => {
-        if (currentPlan) drawDeck(currentPlan);
+        const plan = displayedPlan || currentPlan;
+        if (plan) drawDeck(plan);
       });
     }
 
