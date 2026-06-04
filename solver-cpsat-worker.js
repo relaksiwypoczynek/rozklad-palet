@@ -1,4 +1,11 @@
 import { CpModel, CpSolver, CpSolverStatus } from "./vendor/cpsat-js/dist/index.js";
+import { create } from "./vendor/@bufbuild/protobuf/dist/esm/index.js";
+import {
+  IntervalConstraintProtoSchema,
+  NoOverlap2DConstraintProtoSchema,
+  PartialVariableAssignmentSchema
+} from "./vendor/cpsat-js/dist/generated/cp_model_pb.js";
+import { toLinearExpr } from "./vendor/cpsat-js/dist/model/linear-expr.js";
 
 let cachedSolver = null;
 
@@ -263,6 +270,58 @@ function greedyUpperBound(items, trailer, allowRotate) {
   return Math.max(1, bins.length);
 }
 
+function greedyWarmStart(items, trailer, allowRotate) {
+  const ordered = items.slice().sort((a, b) =>
+    b.packArea - a.packArea ||
+    b.longSide - a.longSide ||
+    a.index - b.index
+  );
+  const bins = [];
+  const placements = new Map();
+
+  for (const item of ordered) {
+    let placed = false;
+    for (let binIndex = 0; binIndex < bins.length; binIndex++) {
+      const node = bins[binIndex].bin.insert(item, allowRotate);
+      if (!node) continue;
+      const placement = {
+        binIndex,
+        x: node.x,
+        y: node.y,
+        rotated: node.orient.rotated,
+        packLength: node.orient.packLength,
+        packWidth: node.orient.packWidth
+      };
+      bins[binIndex].placements.push({ item, placement });
+      placements.set(item.id, placement);
+      placed = true;
+      break;
+    }
+    if (placed) continue;
+
+    const bin = new MaxRectsBin(trailer.length, trailer.width);
+    const node = bin.insert(item, allowRotate);
+    if (!node) return null;
+    const binIndex = bins.length;
+    const placement = {
+      binIndex,
+      x: node.x,
+      y: node.y,
+      rotated: node.orient.rotated,
+      packLength: node.orient.packLength,
+      packWidth: node.orient.packWidth
+    };
+    bins.push({ bin, placements: [{ item, placement }] });
+    placements.set(item.id, placement);
+  }
+
+  return {
+    bins,
+    placements,
+    count: bins.length
+  };
+}
+
 function overlapAmount(aStart, aSize, bStart, bSize) {
   return Math.max(0, Math.min(aStart + aSize, bStart + bSize) - Math.max(aStart, bStart));
 }
@@ -374,14 +433,22 @@ function layoutPocketPenalty(placed, trailer) {
   let staggerWaste = 0;
   for (const item of placed) {
     const rightEdge = item.x + item.packLength;
+    let bestGap = Infinity;
+    let bestOverlap = 0;
     for (const other of placed) {
       if (other === item) continue;
       if (other.x <= rightEdge) continue;
       const overlap = overlapAmount(item.y, item.packWidth, other.y, other.packWidth);
       if (overlap > 0) {
-        staggerWaste += (other.x - rightEdge) * overlap;
-        break;
+        const gap = other.x - rightEdge;
+        if (gap < bestGap) {
+          bestGap = gap;
+          bestOverlap = overlap;
+        }
       }
+    }
+    if (bestGap > 20 && Number.isFinite(bestGap)) {
+      staggerWaste += bestGap * bestOverlap;
     }
   }
   return activeWaste + staggerWaste * 0.45;
@@ -418,7 +485,7 @@ function layoutScoreTuple(placed, trailer, gap = 0) {
   const contact = layoutContact(placed, trailer);
   const alignedRowScore = layoutAlignedRowScore(placed, trailer);
   const bandScore = layoutFullBandScore(placed, trailer);
-  return [-alignedRowScore, -bandScore, packUsedLength, pocketPenalty, packUsedWidth, sumX, sumY, -contact, placed.length];
+  return [packUsedLength, pocketPenalty, -alignedRowScore, -bandScore, packUsedWidth, sumX, sumY, -contact, placed.length];
 }
 
 function skylineRepack(sources, trailer, allowRotate, gap, label) {
@@ -647,7 +714,7 @@ function dynamicRowsRepack(sources, trailer, allowRotate, gap, label) {
 
   return {
     label,
-    placed: placed.sort((a, b) => a.x - b.x || a.y - b.y)
+    placed: compactPlacedItems(placed, trailer)
   };
 }
 
@@ -753,6 +820,56 @@ function toExpr(value) {
   return value;
 }
 
+function literalIndex(literal) {
+  return typeof literal === "number" ? literal : literal.index;
+}
+
+function addOptionalInterval(model, start, size, end, presenceLiteral, name) {
+  const constraint = model.addConstraintProto();
+  constraint.name = name;
+  constraint.enforcementLiteral = [literalIndex(presenceLiteral)];
+  constraint.constraint = {
+    case: "interval",
+    value: create(IntervalConstraintProtoSchema, {
+      start: toLinearExpr(start).toProto(),
+      size: toLinearExpr(size).toProto(),
+      end: toLinearExpr(end).toProto()
+    })
+  };
+  return model.toProto().constraints.length - 1;
+}
+
+function addNoOverlap2D(model, xIntervals, yIntervals, name) {
+  const constraint = model.addConstraintProto();
+  constraint.name = name;
+  constraint.constraint = {
+    case: "noOverlap2d",
+    value: create(NoOverlap2DConstraintProtoSchema, {
+      xIntervals,
+      yIntervals
+    })
+  };
+  return constraint;
+}
+
+function addSolutionHint(model, assignments) {
+  const vars = [];
+  const values = [];
+  const seen = new Set();
+  for (const [variable, value] of assignments) {
+    if (!variable || typeof variable.index !== "number" || !Number.isFinite(value)) continue;
+    if (seen.has(variable.index)) continue;
+    seen.add(variable.index);
+    vars.push(variable.index);
+    values.push(BigInt(Math.round(value)));
+  }
+  if (vars.length === 0) return;
+  model.toProto().solutionHint = create(PartialVariableAssignmentSchema, {
+    vars,
+    values
+  });
+}
+
 function exactlyOne(model, bools) {
   model.add(linearSum(bools).equals(1));
 }
@@ -784,7 +901,8 @@ function solveCpSatLayout(solver, payload, requestId) {
   const items = orderItemsForVariant(expandedItems, layoutVariant, payload.inputSeed || 1);
   const totalArea = items.reduce((sum, item) => sum + item.packArea, 0);
   const lowerBound = Math.max(1, Math.ceil(totalArea / Math.max(1, trailer.length * trailer.width)));
-  const upperBound = greedyUpperBound(items, trailer, allowRotate);
+  const warmStart = greedyWarmStart(items, trailer, allowRotate);
+  const upperBound = warmStart ? warmStart.count : greedyUpperBound(items, trailer, allowRotate);
   if (!upperBound) throw new Error("Co najmniej jedna paleta nie miesci sie na naczepie w zadnej orientacji.");
 
   progress(requestId, "cpsatRange", { count: items.length, lower: lowerBound, upper: upperBound });
@@ -792,6 +910,8 @@ function solveCpSatLayout(solver, payload, requestId) {
   const model = new CpModel("pallet_2d_bin_packing");
   const x = [];
   const y = [];
+  const xEnd = [];
+  const yEnd = [];
   const rot = [];
   const packLength = [];
   const packWidth = [];
@@ -818,18 +938,24 @@ function solveCpSatLayout(solver, payload, requestId) {
     packWidth[i] = buildPackWidthExpr(item, rot[i]);
     actualLength[i] = rot[i] ? rot[i].times(item.width - item.length).plus(item.length) : item.length;
     actualWidth[i] = rot[i] ? rot[i].times(item.length - item.width).plus(item.width) : item.width;
-    model.add(x[i].plus(packLength[i]).le(trailer.length));
-    model.add(y[i].plus(packWidth[i]).le(trailer.width));
+    xEnd[i] = model.newIntVar(0, trailer.length, `x_end_${i}`);
+    yEnd[i] = model.newIntVar(0, trailer.width, `y_end_${i}`);
+    model.add(xEnd[i].equals(x[i].plus(packLength[i])));
+    model.add(yEnd[i].equals(y[i].plus(packWidth[i])));
   }
 
   const used = [];
   const usedLength = [];
   const usedWidth = [];
   const assign = [];
+  const xIntervalsByBin = [];
+  const yIntervalsByBin = [];
   for (let k = 0; k < upperBound; k++) {
     used[k] = model.newBoolVar(`used_${k}`);
     usedLength[k] = model.newIntVar(0, trailer.length, `used_len_${k}`);
     usedWidth[k] = model.newIntVar(0, trailer.width, `used_wid_${k}`);
+    xIntervalsByBin[k] = [];
+    yIntervalsByBin[k] = [];
     model.add(usedLength[k].le(used[k].times(trailer.length)));
     model.add(usedWidth[k].le(used[k].times(trailer.width)));
     if (k > 0) model.add(used[k].le(used[k - 1]));
@@ -840,34 +966,59 @@ function solveCpSatLayout(solver, payload, requestId) {
     for (let k = 0; k < upperBound; k++) {
       assign[i][k] = model.newBoolVar(`a_${i}_${k}`);
       model.add(assign[i][k].le(used[k]));
-      model.add(usedLength[k].ge(x[i].plus(packLength[i]))).onlyEnforceIf(assign[i][k]);
-      model.add(usedWidth[k].ge(y[i].plus(packWidth[i]))).onlyEnforceIf(assign[i][k]);
+      model.add(usedLength[k].ge(xEnd[i])).onlyEnforceIf(assign[i][k]);
+      model.add(usedWidth[k].ge(yEnd[i])).onlyEnforceIf(assign[i][k]);
+      xIntervalsByBin[k].push(addOptionalInterval(
+        model,
+        x[i],
+        packLength[i],
+        xEnd[i],
+        assign[i][k],
+        `x_interval_${i}_${k}`
+      ));
+      yIntervalsByBin[k].push(addOptionalInterval(
+        model,
+        y[i],
+        packWidth[i],
+        yEnd[i],
+        assign[i][k],
+        `y_interval_${i}_${k}`
+      ));
     }
     exactlyOne(model, assign[i]);
   }
 
   for (let k = 0; k < upperBound; k++) {
+    addNoOverlap2D(model, xIntervalsByBin[k], yIntervalsByBin[k], `no_overlap_2d_${k}`);
+  }
+
+  if (warmStart) {
+    const hints = [];
+    for (let k = 0; k < upperBound; k++) {
+      const bin = warmStart.bins[k];
+      const binPlacements = bin?.placements || [];
+      const hintUsedLength = binPlacements.reduce((max, entry) =>
+        Math.max(max, entry.placement.x + entry.placement.packLength), 0);
+      const hintUsedWidth = binPlacements.reduce((max, entry) =>
+        Math.max(max, entry.placement.y + entry.placement.packWidth), 0);
+      hints.push([used[k], binPlacements.length > 0 ? 1 : 0]);
+      hints.push([usedLength[k], hintUsedLength]);
+      hints.push([usedWidth[k], hintUsedWidth]);
+    }
+
     for (let i = 0; i < items.length; i++) {
-      for (let j = i + 1; j < items.length; j++) {
-        const left = model.newBoolVar(`left_${i}_${j}_${k}`);
-        const right = model.newBoolVar(`right_${i}_${j}_${k}`);
-        const above = model.newBoolVar(`above_${i}_${j}_${k}`);
-        const below = model.newBoolVar(`below_${i}_${j}_${k}`);
-        model.add(x[i].plus(packLength[i]).le(x[j])).onlyEnforceIf(left);
-        model.add(x[j].plus(packLength[j]).le(x[i])).onlyEnforceIf(right);
-        model.add(y[i].plus(packWidth[i]).le(y[j])).onlyEnforceIf(above);
-        model.add(y[j].plus(packWidth[j]).le(y[i])).onlyEnforceIf(below);
-        model.addBoolOr([
-          assign[i][k].not(),
-          assign[j][k].not(),
-          left,
-          right,
-          above,
-          below
-        ]);
-        atMostOne(model, [left, right, above, below]);
+      const placement = warmStart.placements.get(items[i].id);
+      if (!placement) continue;
+      hints.push([x[i], placement.x]);
+      hints.push([y[i], placement.y]);
+      hints.push([xEnd[i], placement.x + placement.packLength]);
+      hints.push([yEnd[i], placement.y + placement.packWidth]);
+      if (rot[i]) hints.push([rot[i], placement.rotated ? 1 : 0]);
+      for (let k = 0; k < upperBound; k++) {
+        hints.push([assign[i][k], placement.binIndex === k ? 1 : 0]);
       }
     }
+    addSolutionHint(model, hints);
   }
 
   const variantPositionWeights = items.map((item, index) => {
@@ -903,7 +1054,8 @@ function solveCpSatLayout(solver, payload, requestId) {
   });
 
   if (result.status !== CpSolverStatus.OPTIMAL && result.status !== CpSolverStatus.FEASIBLE) {
-    throw new Error(`OR-Tools CP-SAT nie znalazl rozwiazania. Status: ${statusName(result.status)}.`);
+    const detail = result.response?.solutionInfo ? ` ${result.response.solutionInfo}` : "";
+    throw new Error(`OR-Tools CP-SAT nie znalazl rozwiazania. Status: ${statusName(result.status)}.${detail}`);
   }
 
   const placed = [];
@@ -951,7 +1103,7 @@ function solveCpSatLayout(solver, payload, requestId) {
       trailer,
       trailerIndex,
       strategyLabel,
-      "WASM CP-SAT + dynamic rows/max-rects"
+      "WASM CP-SAT NoOverlap2D + dynamic rows/max-rects"
     );
     trailers.push(trailerSummary);
     placed.push(...trailerSummary.placed);
@@ -980,7 +1132,7 @@ function solveCpSatLayout(solver, payload, requestId) {
     strategyLabel: result.status === CpSolverStatus.OPTIMAL
       ? "OR-Tools CP-SAT exact + repack"
       : "OR-Tools CP-SAT feasible + repack",
-    method: "WASM CP-SAT + dynamic rows/max-rects",
+    method: "WASM CP-SAT NoOverlap2D + dynamic rows/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
     layoutVariant,
