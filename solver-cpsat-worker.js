@@ -358,8 +358,9 @@ function layoutScoreTuple(placed, trailer, gap = 0) {
   const sumY = placed.reduce((sum, item) => sum + item.y, 0);
   const pocketPenalty = layoutPocketPenalty(placed, trailer);
   const contact = layoutContact(placed, trailer);
-  const pairScore = preferredPairScore(placed, trailer, gap);
-  return [-pairScore, packUsedLength, pocketPenalty, packUsedWidth, sumX, sumY, -contact, placed.length];
+  const alignedRowScore = layoutAlignedRowScore(placed, trailer);
+  const bandScore = layoutFullBandScore(placed, trailer);
+  return [-alignedRowScore, -bandScore, packUsedLength, pocketPenalty, packUsedWidth, sumX, sumY, -contact, placed.length];
 }
 
 function skylineRepack(sources, trailer, allowRotate, gap, label) {
@@ -450,216 +451,146 @@ function roundRobinOrder(sources) {
   return ordered;
 }
 
-function maxRectsTailPack(initialPlaced, remaining, trailer, allowRotate, gap, startX) {
-  if (remaining.length === 0) return initialPlaced.map((item) => ({ ...item }));
-  const tail = {
-    length: Math.max(0, trailer.length - startX),
-    width: trailer.width
-  };
-  if (tail.length <= 0) return null;
-
-  const orders = [
-    remaining.slice().sort((a, b) =>
-      b.packLength * b.packWidth - a.packLength * a.packWidth ||
-      b.packLength - a.packLength ||
-      b.packWidth - a.packWidth ||
-      a.itemIndex - b.itemIndex
-    ),
-    remaining.slice().sort((a, b) =>
-      b.packLength - a.packLength ||
-      b.packWidth - a.packWidth ||
-      b.packLength * b.packWidth - a.packLength * a.packWidth ||
-      a.itemIndex - b.itemIndex
-    ),
-    remaining.slice().sort((a, b) =>
-      b.packWidth - a.packWidth ||
-      b.packLength - a.packLength ||
-      b.packLength * b.packWidth - a.packLength * a.packWidth ||
-      a.itemIndex - b.itemIndex
-    ),
-    roundRobinOrder(remaining)
-  ];
-
-  let best = null;
-  let bestScore = null;
-  for (const ordered of orders) {
-    const bin = new MaxRectsBin(tail.length, tail.width);
-    const tailPlaced = [];
-    let failed = false;
-    for (const source of ordered) {
-      const item = {
-        ...source,
-        length: source.originalLength || source.length,
-        width: source.originalWidth || source.width,
-        packLength: (source.originalLength || source.length) + gap,
-        packWidth: (source.originalWidth || source.width) + gap
-      };
-      const node = bin.insert(item, allowRotate);
-      if (!node) {
-        failed = true;
-        break;
-      }
-      tailPlaced.push(placedFromSource(source, {
-        rotated: node.orient.rotated,
-        packLength: node.orient.packLength,
-        packWidth: node.orient.packWidth,
-        length: node.orient.actualLength,
-        width: node.orient.actualWidth
-      }, startX + node.x, node.y));
-    }
-    if (failed) continue;
-    const candidate = [
-      ...initialPlaced.map((item) => ({ ...item })),
-      ...tailPlaced
-    ].sort((a, b) => a.x - b.x || a.y - b.y);
-    const score = layoutScoreTuple(candidate, trailer, gap);
-    if (!best || compareTuple(score, bestScore) < 0) {
-      best = candidate;
-      bestScore = score;
-    }
+function layoutFullBandScore(placed, trailer) {
+  if (placed.length === 0) return 0;
+  const edges = [...new Set(placed.flatMap((item) => [item.x, item.x + item.packLength]))]
+    .filter((value) => value >= 0 && value <= trailer.length)
+    .sort((a, b) => a - b);
+  let score = 0;
+  for (let i = 0; i < edges.length - 1; i++) {
+    const left = edges[i];
+    const right = edges[i + 1];
+    if (right <= left) continue;
+    const mid = (left + right) / 2;
+    const occupiedWidth = placed
+      .filter((item) => item.x <= mid && item.x + item.packLength >= mid)
+      .reduce((sum, item) => sum + item.packWidth, 0);
+    const gap = Math.max(0, trailer.width - occupiedWidth);
+    const fillRatio = occupiedWidth / Math.max(1, trailer.width);
+    const nearFullBonus = gap <= 20 ? 4 : gap <= 80 ? 2 : gap <= 180 ? 1 : 0;
+    score += (right - left) * fillRatio * (1 + nearFullBonus);
   }
+  return score;
+}
+
+function layoutAlignedRowScore(placed, trailer) {
+  const groups = new Map();
+  for (const item of placed) {
+    const key = String(Math.round(item.x));
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  let score = 0;
+  for (const group of groups.values()) {
+    const occupiedWidth = group.reduce((sum, item) => sum + item.packWidth, 0);
+    if (occupiedWidth > trailer.width) continue;
+    const gap = trailer.width - occupiedWidth;
+    const rowLength = group.reduce((max, item) => Math.max(max, item.packLength), 0);
+    const fillRatio = occupiedWidth / Math.max(1, trailer.width);
+    const nearFullBonus = gap <= 20 ? 6 : gap <= 80 ? 3 : gap <= 180 ? 1 : 0;
+    score += rowLength * fillRatio * (1 + nearFullBonus);
+  }
+  return score;
+}
+
+function rowStateSignature(state) {
+  return state.ids.slice().sort().join(",");
+}
+
+function compareRowScore(a, b) {
+  return compareTuple(a.score, b.score);
+}
+
+function selectRowStates(states, limit) {
+  const bySignature = new Map();
+  for (const state of states) {
+    const signature = rowStateSignature(state);
+    const current = bySignature.get(signature);
+    if (!current || compareRowScore(state, current) < 0) bySignature.set(signature, state);
+  }
+  return [...bySignature.values()].sort(compareRowScore).slice(0, limit);
+}
+
+function findBestWidthRow(remaining, trailer, allowRotate, gap) {
+  const beamLimit = Math.max(80, Math.min(260, remaining.length * 14));
+  let states = [{
+    entries: [],
+    ids: [],
+    usedWidth: 0,
+    rowLength: 0,
+    area: 0,
+    score: [trailer.width, 0, 0, 0]
+  }];
+  let best = null;
+
+  for (let depth = 0; depth < Math.min(remaining.length, 8); depth++) {
+    const next = states.slice();
+    for (const state of states) {
+      const used = new Set(state.ids);
+      for (const source of remaining) {
+        if (used.has(source.id)) continue;
+        for (const orient of placedOrientations(source, trailer, allowRotate, gap)) {
+          const usedWidth = state.usedWidth + orient.packWidth;
+          if (usedWidth > trailer.width) continue;
+          const rowLength = Math.max(state.rowLength, orient.packLength);
+          const area = state.area + orient.packLength * orient.packWidth;
+          const widthWaste = trailer.width - usedWidth;
+          const densityWaste = Math.max(0, rowLength * trailer.width - area);
+          const score = [
+            widthWaste,
+            densityWaste,
+            rowLength,
+            -area,
+            state.entries.length + 1
+          ];
+          const candidate = {
+            entries: [...state.entries, { source, orient }],
+            ids: [...state.ids, source.id],
+            usedWidth,
+            rowLength,
+            area,
+            score
+          };
+          next.push(candidate);
+          if (!best || compareRowScore(candidate, best) < 0) best = candidate;
+        }
+      }
+    }
+    const selected = selectRowStates(next, beamLimit);
+    if (selected.length === states.length && selected.every((state, index) => state === states[index])) break;
+    states = selected;
+  }
+
   return best;
 }
 
-function originalSides(source) {
-  return [
-    source.originalLength || source.length,
-    source.originalWidth || source.width
-  ].sort((a, b) => a - b);
-}
-
-function footprintMatches(source, sideA, sideB) {
-  const sides = originalSides(source);
-  const expected = [sideA, sideB].sort((a, b) => a - b);
-  return Math.abs(sides[0] - expected[0]) <= 2 && Math.abs(sides[1] - expected[1]) <= 2;
-}
-
-function orientationForPack(source, trailer, allowRotate, gap, targetLength, targetWidth) {
-  return placedOrientations(source, trailer, allowRotate, gap).find((orient) =>
-    Math.abs(orient.packLength - targetLength) <= 2 &&
-    Math.abs(orient.packWidth - targetWidth) <= 2
-  ) || null;
-}
-
-function placeRemainingSkyline(initialPlaced, remaining, trailer, allowRotate, gap, compact = true) {
-  const placed = initialPlaced.map((item) => ({ ...item }));
-  for (const source of remaining) {
-    let best = null;
-    for (const orient of placedOrientations(source, trailer, allowRotate, gap)) {
-      const yCandidates = [0, Math.max(0, trailer.width - orient.packWidth)];
-      for (const other of placed) {
-        if (other.y <= trailer.width - orient.packWidth) yCandidates.push(other.y);
-        const afterY = other.y + other.packWidth;
-        if (afterY <= trailer.width - orient.packWidth) yCandidates.push(afterY);
-      }
-      const uniqueY = [...new Set(yCandidates.map((value) => Math.round(value)))].sort((a, b) => a - b);
-      for (const y of uniqueY) {
-        if (y < 0 || y + orient.packWidth > trailer.width) continue;
-        let x = 0;
-        for (const other of placed) {
-          if (!rangesOverlap(y, orient.packWidth, other.y, other.packWidth)) continue;
-          x = Math.max(x, other.x + other.packLength);
-        }
-        if (x + orient.packLength > trailer.length) continue;
-        const candidate = placedFromSource(source, orient, x, y);
-        const score = [
-          x + orient.packLength,
-          layoutPocketPenalty([...placed, candidate], trailer),
-          x,
-          y,
-          -contactScore(candidate, placed, trailer),
-          -orient.packLength * orient.packWidth
-        ];
-        if (!best || compareTuple(score, best.score) < 0) best = { candidate, score };
-      }
-    }
-    if (!best) return null;
-    placed.push(best.candidate);
-  }
-  return compact ? compactPlacedItems(placed, trailer) : placed.sort((a, b) => a.x - b.x || a.y - b.y);
-}
-
-function preferredPairRowsRepack(sources, trailer, allowRotate, gap, label) {
-  const wide115 = sources
-    .filter((item) => footprintMatches(item, 1150, 1700))
-    .sort((a, b) => a.x - b.x || a.y - b.y || a.itemIndex - b.itemIndex);
-  const narrow75 = sources
-    .filter((item) => footprintMatches(item, 750, 1050))
-    .sort((a, b) => a.x - b.x || a.y - b.y || a.itemIndex - b.itemIndex);
-  const pairCount = Math.min(wide115.length, narrow75.length);
-  if (pairCount === 0) return null;
-
-  const pairWideOrient = orientationForPack(wide115[0], trailer, allowRotate, gap, 1150 + gap, 1700 + gap);
-  const pairNarrowOrient = orientationForPack(narrow75[0], trailer, allowRotate, gap, 1050 + gap, 750 + gap);
-  if (!pairWideOrient || !pairNarrowOrient) return null;
-  if (pairWideOrient.packWidth + pairNarrowOrient.packWidth > trailer.width) return null;
-
-  const usedIds = new Set();
+function dynamicRowsRepack(sources, trailer, allowRotate, gap, label) {
+  const remaining = sources.map((item) => ({ ...item }));
   const placed = [];
   let cursorX = 0;
-  for (let i = 0; i < pairCount; i++) {
-    const wide = wide115[i];
-    const narrow = narrow75[i];
-    const rowLength = Math.max(pairWideOrient.packLength, pairNarrowOrient.packLength);
-    if (cursorX + rowLength > trailer.length) return null;
-    placed.push(placedFromSource(wide, pairWideOrient, cursorX, 0));
-    placed.push(placedFromSource(narrow, pairNarrowOrient, cursorX, pairWideOrient.packWidth));
-    usedIds.add(wide.id);
-    usedIds.add(narrow.id);
-    cursorX += rowLength;
+
+  while (remaining.length > 0) {
+    const row = findBestWidthRow(remaining, trailer, allowRotate, gap);
+    if (!row || row.entries.length === 0) return null;
+    if (cursorX + row.rowLength > trailer.length) return null;
+
+    let cursorY = 0;
+    for (const entry of row.entries) {
+      placed.push(placedFromSource(entry.source, entry.orient, cursorX, cursorY));
+      cursorY += entry.orient.packWidth;
+    }
+    const used = new Set(row.ids);
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      if (used.has(remaining[i].id)) remaining.splice(i, 1);
+    }
+    cursorX += row.rowLength;
   }
 
-  const remaining = sources
-    .filter((item) => !usedIds.has(item.id))
-    .sort((a, b) =>
-      b.packLength * b.packWidth - a.packLength * a.packWidth ||
-      b.packLength - a.packLength ||
-      b.packWidth - a.packWidth ||
-      a.itemIndex - b.itemIndex
-    );
-  const completed =
-    maxRectsTailPack(placed, remaining, trailer, allowRotate, gap, cursorX) ||
-    placeRemainingSkyline(placed, remaining, trailer, allowRotate, gap, false);
-  if (!completed) return null;
   return {
     label,
-    placed: completed
+    placed: placed.sort((a, b) => a.x - b.x || a.y - b.y)
   };
-}
-
-function preferredPairScore(placed, trailer, gap) {
-  const wide = placed.filter((item) =>
-    footprintMatches(item, 1150, 1700) &&
-    Math.abs(item.packLength - (1150 + gap)) <= 2 &&
-    Math.abs(item.packWidth - (1700 + gap)) <= 2
-  );
-  const narrow = placed.filter((item) =>
-    footprintMatches(item, 750, 1050) &&
-    Math.abs(item.packLength - (1050 + gap)) <= 2 &&
-    Math.abs(item.packWidth - (750 + gap)) <= 2
-  );
-  let score = 0;
-  const used = new Set();
-  for (const big of wide) {
-    let best = null;
-    for (const small of narrow) {
-      if (used.has(small.id)) continue;
-      const adjacentRight = Math.abs(big.y + big.packWidth - small.y) <= 2;
-      const adjacentLeft = Math.abs(small.y + small.packWidth - big.y) <= 2;
-      if (!adjacentRight && !adjacentLeft) continue;
-      const combinedWidth = Math.max(big.y + big.packWidth, small.y + small.packWidth) - Math.min(big.y, small.y);
-      if (combinedWidth > trailer.width) continue;
-      const overlap = overlapAmount(big.x, big.packLength, small.x, small.packLength);
-      if (overlap < Math.min(big.packLength, small.packLength) * 0.8) continue;
-      const candidateScore = overlap + (trailer.width - combinedWidth <= 20 ? 5000 : 0);
-      if (!best || candidateScore > best.score) best = { small, score: candidateScore };
-    }
-    if (best) {
-      used.add(best.small.id);
-      score += best.score;
-    }
-  }
-  return score;
 }
 
 function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap) {
@@ -681,10 +612,10 @@ function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap) {
   const fallback = { label: "CP-SAT + kompresja", placed: compactPlacedItems(base, trailer) };
   let best = null;
   let bestScore = null;
-  const preferredPair = preferredPairRowsRepack(base, trailer, allowRotate, gap, "CP-SAT + wzorzec 115x170 + 75x105");
-  if (preferredPair) {
-    best = preferredPair;
-    bestScore = layoutScoreTuple(preferredPair.placed, trailer, gap);
+  const dynamicRows = dynamicRowsRepack(base, trailer, allowRotate, gap, "CP-SAT + dynamiczne rzedy pelnej szerokosci");
+  if (dynamicRows) {
+    best = dynamicRows;
+    bestScore = layoutScoreTuple(dynamicRows.placed, trailer, gap);
   }
   for (const order of orders) {
     for (const candidate of [
@@ -923,7 +854,7 @@ function solveCpSatLayout(solver, payload, requestId) {
       trailer,
       trailerIndex,
       strategyLabel,
-      "WASM CP-SAT + skyline/max-rects"
+      "WASM CP-SAT + dynamic rows/max-rects"
     );
     trailers.push(trailerSummary);
     placed.push(...trailerSummary.placed);
@@ -952,7 +883,7 @@ function solveCpSatLayout(solver, payload, requestId) {
     strategyLabel: result.status === CpSolverStatus.OPTIMAL
       ? "OR-Tools CP-SAT exact + repack"
       : "OR-Tools CP-SAT feasible + repack",
-    method: "WASM CP-SAT + skyline/max-rects",
+    method: "WASM CP-SAT + dynamic rows/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
     layoutVariant: Math.max(0, Math.floor(payload.layoutVariant || 0)),
