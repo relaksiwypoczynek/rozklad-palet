@@ -1203,7 +1203,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.7";
+    const APP_VERSION = "2026-06-04.8";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1833,8 +1833,10 @@
       const deepOption = el.searchQuality.querySelector('option[value="deep"]');
       if (fastOption) fastOption.textContent = t("fast");
       if (deepOption) deepOption.textContent = t("optimal");
-      setText('label[for="rotateInput"] span', t("rotate"));
-      setText('label[for="compactInput"] span', t("compact"));
+      const rotateLabel = el.rotate.closest(".check-field")?.querySelector("span");
+      const compactLabel = el.compact.closest(".check-field")?.querySelector("span");
+      if (rotateLabel) rotateLabel.textContent = t("rotate");
+      if (compactLabel) compactLabel.textContent = t("compact");
       setText(".sidebar section:nth-of-type(2) .section-title h2", t("pallets"));
       setText('label[for="newPalletPreset"]', t("size"));
       setText('label[for="newPalletQty"]', t("quantity"));
