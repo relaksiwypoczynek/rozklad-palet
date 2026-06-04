@@ -1,0 +1,1 @@
+{"version":3,"file":"interval-var.js","sourceRoot":"","sources":["../../src/model/interval-var.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,MAAM,OAAO,WAAW;IACtB,wEAAwE;IAC/D,eAAe,CAAS;IACxB,IAAI,CAAS;IAEtB,YAAY,eAAuB,EAAE,IAAY;QAC/C,IAAI,CAAC,eAAe,GAAG,eAAe,CAAC;QACvC,IAAI,CAAC,IAAI,GAAG,IAAI,CAAC;IACnB,CAAC;CACF"}

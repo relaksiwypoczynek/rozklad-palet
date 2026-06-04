@@ -1,0 +1,4564 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rozkład palet na naczepie</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #d8dee7;
+      --line-strong: #b9c3d1;
+      --teal: #0f766e;
+      --teal-dark: #115e59;
+      --amber: #b45309;
+      --red: #b91c1c;
+      --green: #15803d;
+      --blue: #1d4ed8;
+      --shadow: 0 18px 45px rgba(23, 32, 51, 0.08);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 15px;
+      letter-spacing: 0;
+    }
+
+    body {
+      min-width: 320px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line-strong);
+      border-radius: 7px;
+      background: #ffffff;
+      color: var(--ink);
+      min-height: 36px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #94a3b8;
+      background: #f8fafc;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 3px solid rgba(15, 118, 110, 0.2);
+      outline-offset: 1px;
+      border-color: var(--teal);
+    }
+
+    button.primary {
+      background: var(--teal);
+      border-color: var(--teal);
+      color: #ffffff;
+    }
+
+    button.primary:hover {
+      background: var(--teal-dark);
+      border-color: var(--teal-dark);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.68;
+    }
+
+    button.primary:disabled,
+    button.primary:disabled:hover {
+      background: #94a3b8;
+      border-color: #94a3b8;
+      color: #ffffff;
+      opacity: 1;
+    }
+
+    button.danger {
+      color: var(--red);
+      border-color: #fecaca;
+    }
+
+    button.icon {
+      width: 36px;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+      font-weight: 700;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #ffffff;
+      color: var(--ink);
+      padding: 7px 9px;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      min-height: 18px;
+      accent-color: var(--teal);
+    }
+
+    input[type="color"] {
+      padding: 3px;
+      min-width: 42px;
+    }
+
+    .app-header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .header-inner {
+      width: min(1720px, calc(100vw - 32px));
+      margin: 0 auto;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand {
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .brand p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .app-shell {
+      width: min(1720px, calc(100vw - 32px));
+      margin: 18px auto 26px;
+      display: grid;
+      grid-template-columns: minmax(360px, 470px) minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .sidebar,
+    .workspace {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:last-child {
+      border-bottom: 0;
+    }
+
+    details.section {
+      padding: 0;
+    }
+
+    .collapsible-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .collapsible-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .summary-main {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .summary-main strong {
+      font-size: 16px;
+      line-height: 1.2;
+    }
+
+    .summary-main span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .summary-chevron {
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1;
+      transition: transform 0.15s ease;
+    }
+
+    details[open] .summary-chevron {
+      transform: rotate(90deg);
+    }
+
+    .collapsible-body {
+      padding: 0 16px 16px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .field-grid.three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .settings-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .settings-grid .check-field {
+      padding-top: 0;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .field label,
+    .check-field span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .check-field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding-top: 18px;
+    }
+
+    .loads-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .quick-add {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 92px auto;
+      gap: 10px;
+      align-items: end;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel-soft);
+    }
+
+    .custom-add-fields {
+      display: none;
+      grid-column: 1 / -1;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .custom-add-fields.visible {
+      display: grid;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 430px;
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      color: var(--muted);
+      background: var(--panel-soft);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td.actions {
+      width: 54px;
+      white-space: nowrap;
+    }
+
+    .load-main {
+      min-width: 0;
+    }
+
+    .load-summary {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .load-text {
+      min-width: 0;
+    }
+
+    .load-name {
+      display: block;
+      font-weight: 700;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .load-dims {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .qty-input {
+      width: 74px;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .row-actions button {
+      min-height: 32px;
+      padding: 0 9px;
+      white-space: nowrap;
+    }
+
+    .loads-empty {
+      display: none;
+      margin: 10px 0 0;
+    }
+
+    .loads-empty.visible {
+      display: block;
+    }
+
+    .loads-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .loads-footer button {
+      min-width: 104px;
+    }
+
+    .color-cell {
+      width: 58px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .metric {
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      min-width: 0;
+    }
+
+    .metric:last-child {
+      border-right: 0;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 23px;
+      font-weight: 760;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-value.good {
+      color: var(--green);
+    }
+
+    .metric-value.warn {
+      color: var(--amber);
+    }
+
+    .metric-value.bad {
+      color: var(--red);
+    }
+
+    .stage-wrap {
+      padding: 16px;
+    }
+
+    .stage-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .stage-title {
+      min-width: 0;
+    }
+
+    .stage-title h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.25;
+      font-weight: 700;
+    }
+
+    .stage-title p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .stage-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .canvas-shell {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background:
+        linear-gradient(90deg, rgba(15, 118, 110, 0.06) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(15, 118, 110, 0.06) 1px, transparent 1px),
+        #ffffff;
+      background-size: 32px 32px;
+      overflow: hidden;
+      min-height: 360px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 460px;
+    }
+
+    .tooltip {
+      position: absolute;
+      z-index: 2;
+      display: none;
+      max-width: 260px;
+      padding: 9px 10px;
+      border-radius: 7px;
+      background: rgba(23, 32, 51, 0.94);
+      color: #ffffff;
+      pointer-events: none;
+      box-shadow: 0 10px 24px rgba(23, 32, 51, 0.18);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .tooltip strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 13px;
+    }
+
+    .below-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .result-box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #ffffff;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .result-box h3 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+    .legend-list,
+    .issue-list,
+    .source-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid rgba(23, 32, 51, 0.18);
+    }
+
+    .legend-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend-count {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .issue-list li {
+      color: var(--red);
+      line-height: 1.35;
+    }
+
+    .issue-list li.info {
+      color: var(--muted);
+    }
+
+    .source-list li {
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .source-list a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .source-list a:hover {
+      text-decoration: underline;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      min-width: 0;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--green);
+      flex: 0 0 auto;
+    }
+
+    .status-dot.warn {
+      background: var(--amber);
+    }
+
+    .status-dot.bad {
+      background: var(--red);
+    }
+
+    .status-spinner {
+      display: none;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #cbd5e1;
+      border-top-color: var(--teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex: 0 0 auto;
+    }
+
+    body.is-calculating .status-spinner {
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .calc-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: none;
+      place-items: start center;
+      padding-top: 34px;
+      background: rgba(248, 250, 252, 0.72);
+      pointer-events: none;
+    }
+
+    .calc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 9px 12px;
+      color: var(--ink);
+      font-weight: 700;
+      box-shadow: 0 10px 22px rgba(23, 32, 51, 0.12);
+    }
+
+    body.is-calculating .calc-overlay {
+      display: grid;
+    }
+
+    .empty-state {
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .footnote {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 1180px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        order: 2;
+      }
+
+      .workspace {
+        order: 1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .header-inner,
+      .app-shell {
+        width: min(100vw - 20px, 1720px);
+      }
+
+      .app-shell {
+        margin-top: 10px;
+        gap: 10px;
+      }
+
+      .sidebar {
+        order: 1;
+      }
+
+      .workspace {
+        order: 2;
+      }
+
+      .header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 14px 0;
+      }
+
+      .header-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: flex-start;
+        width: 100%;
+      }
+
+      .header-actions button {
+        width: 100%;
+        min-height: 40px;
+      }
+
+      .quick-add {
+        grid-template-columns: 1fr 76px;
+      }
+
+      .quick-add button {
+        grid-column: 1 / -1;
+      }
+
+      .custom-add-fields {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid,
+      .settings-grid,
+      .below-stage {
+        grid-template-columns: 1fr;
+      }
+
+      .field-grid.three,
+      .metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stage-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .stage-actions button {
+        flex: 1 1 130px;
+      }
+
+      .section,
+      .stage-wrap {
+        padding: 12px;
+      }
+
+      input,
+      select,
+      button {
+        min-height: 40px;
+      }
+
+      .metric {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
+      }
+
+      .metric:nth-child(odd) {
+        border-right: 1px solid var(--line);
+      }
+
+      .metric:last-child {
+        border-bottom: 0;
+      }
+
+      .metric-value {
+        font-size: 20px;
+      }
+
+      .table-wrap {
+        overflow: visible;
+        border: 0;
+        background: transparent;
+      }
+
+      table {
+        display: block;
+        min-width: 0;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tbody {
+        display: grid;
+        gap: 0;
+      }
+
+      tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 82px 42px;
+        gap: 8px;
+        align-items: center;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: #ffffff;
+        padding: 8px;
+      }
+
+      tr:last-child td,
+      td {
+        display: block;
+        align-items: center;
+        border-bottom: 0;
+        padding: 0;
+      }
+
+      td::before {
+        content: none;
+      }
+
+      td.actions {
+        width: auto;
+      }
+
+      tr:last-child td.actions,
+      td.actions {
+        display: block;
+        white-space: nowrap;
+      }
+
+      tr:last-child td.actions::before,
+      td.actions::before {
+        content: none;
+      }
+
+      .row-actions {
+        justify-content: flex-end;
+      }
+
+      .check-field {
+        padding-top: 0;
+      }
+
+      .icon {
+        width: 40px;
+      }
+
+      .sources-section,
+      .sidebar .section:last-child {
+        display: none;
+      }
+
+      .canvas-shell {
+        min-height: 250px;
+      }
+
+      canvas {
+        height: 300px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <h1>Rozkład palet na naczepie</h1>
+        <p>Jednoplikowy kalkulator 2D dla jednej warstwy palet.</p>
+      </div>
+      <div class="header-actions">
+        <button id="resetDemoBtn" type="button">Wyczyść listę</button>
+        <button id="csvBtn" type="button">CSV</button>
+        <button id="printBtn" type="button">Drukuj</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="sidebar">
+      <details class="section trailer-settings">
+        <summary class="collapsible-summary">
+          <span class="summary-main">
+            <strong>Naczepa</strong>
+            <span id="trailerSummary">KRONE Profi Liner - 13620 x 2480</span>
+          </span>
+          <span class="summary-chevron" aria-hidden="true">›</span>
+        </summary>
+        <div class="collapsible-body field-grid">
+          <div class="field" style="grid-column: 1 / -1;">
+            <label for="trailerPreset">Preset</label>
+            <select id="trailerPreset"></select>
+          </div>
+          <div class="field">
+            <label for="trailerLength">Długość [mm]</label>
+            <input id="trailerLength" type="number" min="1" step="10" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="trailerWidth">Szerokość [mm]</label>
+            <input id="trailerWidth" type="number" min="1" step="10" inputmode="numeric">
+          </div>
+        </div>
+      </details>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Ustawienia</h2>
+        </div>
+        <div class="field-grid settings-grid">
+          <div class="field">
+            <label for="gapInput">Luz [mm]</label>
+            <input id="gapInput" type="number" min="0" step="5" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label for="searchQuality">Tryb liczenia</label>
+            <select id="searchQuality">
+              <option value="fast">Szybki</option>
+              <option value="deep">Optymalny</option>
+            </select>
+          </div>
+          <label class="check-field">
+            <input id="rotateInput" type="checkbox">
+            <span>Obrót 90°</span>
+          </label>
+          <label class="check-field">
+            <input id="compactInput" type="checkbox">
+            <span>Kompaktuj LDM</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Palety</h2>
+        </div>
+        <div class="quick-add">
+          <div class="field">
+            <label for="newPalletPreset">Rozmiar</label>
+            <select id="newPalletPreset"></select>
+          </div>
+          <div class="field">
+            <label for="newPalletQty">Ilość</label>
+            <input id="newPalletQty" type="number" min="1" step="1" inputmode="numeric" value="1">
+          </div>
+          <button id="addLoadBtn" class="primary" type="button">Dodaj</button>
+          <div id="customAddFields" class="custom-add-fields">
+            <div class="field">
+              <label for="customPalletLength">Długość [mm]</label>
+              <input id="customPalletLength" type="number" min="1" step="10" inputmode="numeric" value="1000">
+            </div>
+            <div class="field">
+              <label for="customPalletWidth">Szerokość [mm]</label>
+              <input id="customPalletWidth" type="number" min="1" step="10" inputmode="numeric" value="900">
+            </div>
+            <div class="field">
+              <label for="customPalletName">Nazwa</label>
+              <input id="customPalletName" value="Własna">
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table aria-label="Lista palet">
+            <thead>
+              <tr>
+                <th>Paleta</th>
+                <th>Ilość</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="loadsBody"></tbody>
+          </table>
+        </div>
+        <p id="emptyLoads" class="empty-state loads-empty">Brak palet do ułożenia.</p>
+        <div class="loads-footer">
+          <span id="loadsCount">Dodano 0 palet</span>
+          <button id="recalcBtn" class="primary" type="button">Przelicz</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-title">
+          <h2>Założenia danych</h2>
+        </div>
+        <ul class="source-list">
+          <li>EPAL: EPAL 1 ma wymiar 800 x 1200 mm, EPAL 2 ma 1200 x 1000 mm, EPAL 6 ma 800 x 600 mm. Źródło: <a href="https://epal.org.pl/palety/" target="_blank" rel="noreferrer">Polski Komitet Narodowy EPAL</a>.</li>
+          <li>ISO 6780:2003 określa główne wymiary i tolerancje palet płaskich; publiczne zestawienia ISO 6780 podają sześć footprintów użytych w presetach. Źródła: <a href="https://www.iso.org/standard/30524.html" target="_blank" rel="noreferrer">ISO</a>, <a href="https://palletizing.com/wp-content/uploads/2017/11/Science-of-Palletizing.pdf" target="_blank" rel="noreferrer">tabela wymiarów</a>.</li>
+          <li>Naczepa KRONE Profi Liner: przestrzeń ładunkowa 13620 x 2480 mm. Źródło: <a href="https://www.krone-trailer.com/en/products/curtain-semitrailer/profi-liner/" target="_blank" rel="noreferrer">KRONE</a>.</li>
+        </ul>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-label">Ułożono</div>
+          <div id="placedMetric" class="metric-value">0 / 0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Wypełnienie</div>
+          <div id="fillMetric" class="metric-value">0%</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">LDM razem</div>
+          <div id="ldmMetric" class="metric-value">0,00</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Naczepy</div>
+          <div id="trailersMetric" class="metric-value">0</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Nieułożone</div>
+          <div id="missingMetric" class="metric-value">0</div>
+        </div>
+      </div>
+
+      <div class="stage-wrap">
+        <div class="stage-toolbar">
+          <div class="stage-title">
+            <h2>Widok z góry</h2>
+            <p id="planSubtitle">Brak danych do obliczenia.</p>
+          </div>
+          <div class="stage-actions">
+            <button id="alternateBtn" type="button">Inny układ</button>
+            <div id="statusLine" class="status-line">
+              <span class="status-spinner" aria-hidden="true"></span>
+              <span class="status-dot"></span>
+              <span>Gotowe</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="canvasShell" class="canvas-shell">
+          <canvas id="deckCanvas" aria-label="Rzut naczepy z paletami"></canvas>
+          <div id="calcOverlay" class="calc-overlay" aria-hidden="true">
+            <div class="calc-badge">
+              <span class="status-spinner"></span>
+              <span id="calcOverlayText">Liczenie układu...</span>
+            </div>
+          </div>
+          <div id="tooltip" class="tooltip"></div>
+        </div>
+
+        <div class="below-stage">
+          <div class="result-box">
+            <h3>Legenda</h3>
+            <ul id="legendList" class="legend-list"></ul>
+          </div>
+          <div class="result-box">
+            <h3>Komunikaty</h3>
+            <ul id="issueList" class="issue-list"></ul>
+          </div>
+        </div>
+
+        <p class="footnote">Model uwzględnia tylko footprint na podłodze. Masa, środek ciężkości, naciski na osie, wysokość ładunku, pasy, kliny i kolejność rozładunku wymagają osobnej kontroli operacyjnej.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "rozkladPalet.v3";
+    const DEFAULT_GAP = 10;
+    const GAP_DEFAULT_VERSION = 2;
+
+    const SEARCH_QUALITY = {
+      fast: { label: "Szybki", randomRuns: 4, budgetMs: 900, beamScale: 0.62, branchScale: 0.68 },
+      deep: { label: "Optymalny", randomRuns: 180, budgetMs: 180000, beamScale: 1.85, branchScale: 1.72 }
+    };
+
+    const TRAILER_PRESETS = [
+      { key: "krone-profi", label: "KRONE Profi Liner - 13620 x 2480", length: 13620, width: 2480 },
+      { key: "std-136-240", label: "Standard branżowy - 13600 x 2400", length: 13600, width: 2400 },
+      { key: "mega-136-248", label: "Mega/Jumbo floor - 13620 x 2480", length: 13620, width: 2480 },
+      { key: "custom", label: "Własne wymiary", length: 13620, width: 2480 }
+    ];
+
+    const PALLET_PRESETS = [
+      { key: "size-115-170", label: "115 x 170 cm", name: "115x170", length: 1150, width: 1700, color: "#0f766e" },
+      { key: "size-115-135", label: "115 x 135 cm", name: "115x135", length: 1150, width: 1350, color: "#1d4ed8" },
+      { key: "size-75-105", label: "75 x 105 cm", name: "75x105", length: 750, width: 1050, color: "#b45309" },
+      { key: "size-55-105", label: "55 x 105 cm", name: "55x105", length: 550, width: 1050, color: "#15803d" },
+      { key: "size-95-135", label: "95 x 135 cm", name: "95x135", length: 950, width: 1350, color: "#be123c" },
+      { key: "size-100-120", label: "100 x 120 cm", name: "100x120", length: 1000, width: 1200, color: "#0369a1" },
+      { key: "size-100-115", label: "100 x 115 cm", name: "100x115", length: 1000, width: 1150, color: "#7c3aed" },
+      { key: "epal1", label: "EPAL 1 / EUR - 1200 x 800", name: "EPAL 1", length: 1200, width: 800, color: "#0f766e" },
+      { key: "epal2", label: "EPAL 2 - 1200 x 1000", name: "EPAL 2", length: 1200, width: 1000, color: "#1d4ed8" },
+      { key: "epal3", label: "EPAL 3 - 1000 x 1200", name: "EPAL 3", length: 1000, width: 1200, color: "#7c3aed" },
+      { key: "epal6", label: "EPAL 6 half - 800 x 600", name: "EPAL 6", length: 800, width: 600, color: "#b45309" },
+      { key: "iso-1219-1016", label: "ISO/GMA - 1219 x 1016", name: "ISO/GMA", length: 1219, width: 1016, color: "#be123c" },
+      { key: "iso-1140", label: "ISO - 1140 x 1140", name: "ISO 1140", length: 1140, width: 1140, color: "#15803d" },
+      { key: "iso-1067", label: "ISO - 1067 x 1067", name: "ISO 1067", length: 1067, width: 1067, color: "#0369a1" },
+      { key: "iso-1100", label: "ISO - 1100 x 1100", name: "ISO 1100", length: 1100, width: 1100, color: "#ca8a04" },
+      { key: "custom", label: "Nietypowa / własna", name: "Nietypowa", length: 1000, width: 900, color: "#475569" }
+    ];
+
+    const ORDER_STRATEGIES = [
+      {
+        key: "area-desc",
+        label: "Największa powierzchnia",
+        sort: (a, b) => b.packArea - a.packArea || b.longSide - a.longSide || a.index - b.index
+      },
+      {
+        key: "long-side-desc",
+        label: "Najdłuższy bok",
+        sort: (a, b) => b.longSide - a.longSide || b.packArea - a.packArea || a.index - b.index
+      },
+      {
+        key: "length-desc",
+        label: "Długość",
+        sort: (a, b) => b.packLength - a.packLength || b.packWidth - a.packWidth || a.index - b.index
+      },
+      {
+        key: "width-desc",
+        label: "Szerokość",
+        sort: (a, b) => b.packWidth - a.packWidth || b.packLength - a.packLength || a.index - b.index
+      },
+      {
+        key: "input",
+        label: "Kolejność z tabeli",
+        sort: (a, b) => a.index - b.index
+      },
+      {
+        key: "area-asc",
+        label: "Małe pierwsze",
+        sort: (a, b) => a.packArea - b.packArea || a.index - b.index
+      }
+    ];
+
+    const PACK_METHODS = ["shortSide", "areaFit", "bottomLeft", "contact"];
+    const ROUND_ROBIN_MODE_COUNT = 2;
+    const ROW_PACK_COUNT = 2;
+    const BEAM_PACK_PROFILES = [
+      { key: "balanced", label: "kombinacje rzedow", beamWidth: 360, branchLimit: 58, densityWeight: 8500, lengthWeight: 85, wasteWeight: 0.24, mixWeight: 1300, repeatWeight: 1050 },
+      { key: "dense", label: "kombinacje geste", beamWidth: 420, branchLimit: 70, densityWeight: 12500, lengthWeight: 70, wasteWeight: 0.34, mixWeight: 1700, repeatWeight: 1300 },
+      { key: "compact", label: "kombinacje LDM", beamWidth: 320, branchLimit: 52, densityWeight: 6500, lengthWeight: 125, wasteWeight: 0.18, mixWeight: 900, repeatWeight: 900 },
+      { key: "anti-block", label: "kombinacje bez grupowania", beamWidth: 460, branchLimit: 76, densityWeight: 9800, lengthWeight: 92, wasteWeight: 0.28, mixWeight: 2600, repeatWeight: 2500 }
+    ];
+    const BASE_PACK_VARIANT_COUNT =
+      ORDER_STRATEGIES.length * PACK_METHODS.length +
+      ROUND_ROBIN_MODE_COUNT * PACK_METHODS.length +
+      PACK_METHODS.length +
+      ROW_PACK_COUNT +
+      BEAM_PACK_PROFILES.length;
+
+    const state = {
+      trailerPreset: "krone-profi",
+      trailerLength: 13620,
+      trailerWidth: 2480,
+      gap: DEFAULT_GAP,
+      allowRotate: true,
+      compactLength: true,
+      searchQuality: "deep",
+      layoutVariant: 0,
+      rows: [],
+      nextRowId: 1
+    };
+
+    const el = {
+      trailerPreset: document.getElementById("trailerPreset"),
+      trailerSummary: document.getElementById("trailerSummary"),
+      trailerLength: document.getElementById("trailerLength"),
+      trailerWidth: document.getElementById("trailerWidth"),
+      gap: document.getElementById("gapInput"),
+      rotate: document.getElementById("rotateInput"),
+      compact: document.getElementById("compactInput"),
+      searchQuality: document.getElementById("searchQuality"),
+      loadsBody: document.getElementById("loadsBody"),
+      emptyLoads: document.getElementById("emptyLoads"),
+      loadsCount: document.getElementById("loadsCount"),
+      newPalletPreset: document.getElementById("newPalletPreset"),
+      newPalletQty: document.getElementById("newPalletQty"),
+      customAddFields: document.getElementById("customAddFields"),
+      customPalletLength: document.getElementById("customPalletLength"),
+      customPalletWidth: document.getElementById("customPalletWidth"),
+      customPalletName: document.getElementById("customPalletName"),
+      addLoad: document.getElementById("addLoadBtn"),
+      resetDemo: document.getElementById("resetDemoBtn"),
+      recalc: document.getElementById("recalcBtn"),
+      alternate: document.getElementById("alternateBtn"),
+      csv: document.getElementById("csvBtn"),
+      print: document.getElementById("printBtn"),
+      canvas: document.getElementById("deckCanvas"),
+      canvasShell: document.getElementById("canvasShell"),
+      calcOverlayText: document.getElementById("calcOverlayText"),
+      tooltip: document.getElementById("tooltip"),
+      placedMetric: document.getElementById("placedMetric"),
+      fillMetric: document.getElementById("fillMetric"),
+      ldmMetric: document.getElementById("ldmMetric"),
+      trailersMetric: document.getElementById("trailersMetric"),
+      missingMetric: document.getElementById("missingMetric"),
+      planSubtitle: document.getElementById("planSubtitle"),
+      statusLine: document.getElementById("statusLine"),
+      legendList: document.getElementById("legendList"),
+      issueList: document.getElementById("issueList")
+    };
+
+    let currentPlan = null;
+    let drawState = null;
+    let hoveredId = null;
+    let recalcTimer = null;
+    let isCalculating = false;
+    let calculationToken = 0;
+    let activeSolverWorker = null;
+
+    function numberValue(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
+    function clampNumber(value, min, fallback) {
+      const parsed = numberValue(value, fallback);
+      return Math.max(min, parsed);
+    }
+
+    function formatInt(value) {
+      return Math.round(value).toLocaleString("pl-PL");
+    }
+
+    function formatDecimal(value, digits = 2) {
+      return Number(value).toLocaleString("pl-PL", {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits
+      });
+    }
+
+    function formatPercent(value) {
+      return `${formatDecimal(value * 100, 1)}%`;
+    }
+
+    function formatTrailerCount(count) {
+      const value = Math.max(0, Math.round(count));
+      if (value === 1) return "1 naczepa";
+      const mod10 = value % 10;
+      const mod100 = value % 100;
+      const word = mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14) ? "naczepy" : "naczep";
+      return `${formatInt(value)} ${word}`;
+    }
+
+    function formatPalletCount(count) {
+      const value = Math.max(0, Math.round(count));
+      if (value === 1) return "1 paletę";
+      const mod10 = value % 10;
+      const mod100 = value % 100;
+      const word = mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14) ? "palety" : "palet";
+      return `${formatInt(value)} ${word}`;
+    }
+
+    function nowMs() {
+      return typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+    }
+
+    function searchQualityConfig(value) {
+      return SEARCH_QUALITY[value] || SEARCH_QUALITY.deep;
+    }
+
+    function packVariantCount(quality) {
+      return BASE_PACK_VARIANT_COUNT + searchQualityConfig(quality).randomRuns;
+    }
+
+    function normalizeSeed(value) {
+      return Number.isFinite(value) ? value >>> 0 : 1;
+    }
+
+    function mixSeed(...values) {
+      let seed = 2166136261;
+      for (const value of values) {
+        seed ^= normalizeSeed(Math.round(value));
+        seed = Math.imul(seed, 16777619);
+      }
+      return seed >>> 0;
+    }
+
+    function createRng(seed) {
+      let state = normalizeSeed(seed) || 1;
+      return () => {
+        state += 0x6D2B79F5;
+        let t = state;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function inputSeed(items, trailer, gap, allowRotate) {
+      let seed = mixSeed(trailer.length, trailer.width, gap, allowRotate ? 1 : 0, items.length);
+      for (const item of items) {
+        seed = mixSeed(seed, item.rowId, item.length, item.width, item.itemIndex, item.index);
+      }
+      return seed;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function createRow(presetKey = "epal1", quantity = 1) {
+      const preset = PALLET_PRESETS.find((item) => item.key === presetKey) || PALLET_PRESETS[0];
+      return {
+        id: state.nextRowId++,
+        presetKey: preset.key,
+        name: preset.name,
+        length: preset.length,
+        width: preset.width,
+        quantity,
+        color: preset.color
+      };
+    }
+
+    function defaultState() {
+      state.trailerPreset = "krone-profi";
+      state.trailerLength = 13620;
+      state.trailerWidth = 2480;
+      state.gap = DEFAULT_GAP;
+      state.allowRotate = true;
+      state.compactLength = true;
+      state.searchQuality = "deep";
+      state.layoutVariant = 0;
+      state.rows = [];
+      state.nextRowId = 1;
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+        if (!saved || !Array.isArray(saved.rows)) {
+          defaultState();
+          return;
+        }
+        state.trailerPreset = saved.trailerPreset || "custom";
+        state.trailerLength = clampNumber(saved.trailerLength, 1, 13620);
+        state.trailerWidth = clampNumber(saved.trailerWidth, 1, 2480);
+        const savedGap = clampNumber(saved.gap, 0, DEFAULT_GAP);
+        state.gap = saved.gapDefaultVersion === GAP_DEFAULT_VERSION
+          ? savedGap
+          : (savedGap === 20 ? DEFAULT_GAP : savedGap);
+        state.allowRotate = Boolean(saved.allowRotate);
+        state.compactLength = saved.compactLength !== false;
+        state.searchQuality = saved.searchQuality === "fast" ? "fast" : "deep";
+        state.layoutVariant = Math.floor(clampNumber(saved.layoutVariant, 0, 0));
+        state.rows = saved.rows.map((row) => ({
+          id: Number.isFinite(Number(row.id)) ? Number(row.id) : state.nextRowId++,
+          presetKey: row.presetKey || "custom",
+          name: String(row.name || "Paleta").slice(0, 60),
+          length: clampNumber(row.length, 1, 1200),
+          width: clampNumber(row.width, 1, 800),
+          quantity: Math.floor(clampNumber(row.quantity, 1, 1)),
+          color: /^#[0-9a-f]{6}$/i.test(row.color || "") ? row.color : "#475569"
+        }));
+        state.nextRowId = Math.max(1, ...state.rows.map((row) => row.id + 1));
+      } catch {
+        defaultState();
+      }
+    }
+
+    function saveState() {
+      const snapshot = {
+        trailerPreset: state.trailerPreset,
+        trailerLength: state.trailerLength,
+        trailerWidth: state.trailerWidth,
+        gap: state.gap,
+        allowRotate: state.allowRotate,
+        compactLength: state.compactLength,
+        gapDefaultVersion: GAP_DEFAULT_VERSION,
+        searchQuality: state.searchQuality,
+        layoutVariant: state.layoutVariant,
+        rows: state.rows
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    }
+
+    function renderSelectOptions() {
+      el.trailerPreset.innerHTML = TRAILER_PRESETS
+        .map((preset) => `<option value="${preset.key}">${escapeHtml(preset.label)}</option>`)
+        .join("");
+      el.newPalletPreset.innerHTML = palletSelectHtml("size-115-170");
+    }
+
+    function palletSelectHtml(selectedKey) {
+      return PALLET_PRESETS
+        .map((preset) => `<option value="${preset.key}" ${preset.key === selectedKey ? "selected" : ""}>${escapeHtml(preset.label)}</option>`)
+        .join("");
+    }
+
+    function updateCustomAddVisibility() {
+      const isCustom = el.newPalletPreset.value === "custom";
+      el.customAddFields.classList.toggle("visible", isCustom);
+    }
+
+    function renderControls() {
+      el.trailerPreset.value = state.trailerPreset;
+      el.trailerLength.value = state.trailerLength;
+      el.trailerWidth.value = state.trailerWidth;
+      el.trailerSummary.textContent = `${formatInt(state.trailerLength)} x ${formatInt(state.trailerWidth)} mm`;
+      el.gap.value = state.gap;
+      el.rotate.checked = state.allowRotate;
+      el.compact.checked = state.compactLength;
+      el.searchQuality.value = state.searchQuality;
+      el.emptyLoads.classList.toggle("visible", state.rows.length === 0);
+      const totalQuantity = state.rows.reduce((sum, row) => sum + Math.floor(clampNumber(row.quantity, 0, 0)), 0);
+      el.loadsCount.textContent = `Dodano ${formatPalletCount(totalQuantity)}`;
+
+      el.loadsBody.innerHTML = state.rows.map((row) => `
+        <tr data-row-id="${row.id}">
+          <td class="load-main" data-label="Paleta">
+            <div class="load-summary">
+              <span class="swatch" style="background:${escapeHtml(row.color)}"></span>
+              <span class="load-text">
+                <span class="load-name">${escapeHtml(row.name)}</span>
+                <span class="load-dims">${formatInt(row.length)} x ${formatInt(row.width)} mm</span>
+              </span>
+            </div>
+          </td>
+          <td data-label="Ilość">
+            <input class="qty-input" data-field="quantity" type="number" min="1" step="1" inputmode="numeric" value="${row.quantity}" aria-label="Ilość palet ${escapeHtml(row.name)}">
+          </td>
+          <td class="actions" data-label="Akcje">
+            <div class="row-actions">
+              <button class="icon danger" type="button" data-action="delete" aria-label="Usuń ${escapeHtml(row.name)}" title="Usuń">×</button>
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function readGlobalInputs() {
+      state.trailerLength = clampNumber(el.trailerLength.value, 1, state.trailerLength);
+      state.trailerWidth = clampNumber(el.trailerWidth.value, 1, state.trailerWidth);
+      state.gap = clampNumber(el.gap.value, 0, state.gap);
+      state.allowRotate = el.rotate.checked;
+      state.compactLength = el.compact.checked;
+      state.searchQuality = el.searchQuality.value === "fast" ? "fast" : "deep";
+      el.trailerSummary.textContent = `${formatInt(state.trailerLength)} x ${formatInt(state.trailerWidth)} mm`;
+    }
+
+    function buildNewPalletRow() {
+      const quantity = Math.floor(clampNumber(el.newPalletQty.value, 1, 1));
+      const preset = PALLET_PRESETS.find((item) => item.key === el.newPalletPreset.value) || PALLET_PRESETS[0];
+      if (preset.key !== "custom") {
+        return { ...createRow(preset.key, quantity), quantity };
+      }
+
+      const length = clampNumber(el.customPalletLength.value, 1, 1000);
+      const width = clampNumber(el.customPalletWidth.value, 1, 900);
+      const name = (el.customPalletName.value || "Własna").trim().slice(0, 60) || "Własna";
+      return {
+        id: state.nextRowId++,
+        presetKey: "custom",
+        name,
+        length,
+        width,
+        quantity,
+        color: "#475569"
+      };
+    }
+
+    function addPalletFromForm() {
+      const newRow = buildNewPalletRow();
+      const existing = state.rows.find((row) =>
+        row.presetKey === newRow.presetKey &&
+        row.name === newRow.name &&
+        row.length === newRow.length &&
+        row.width === newRow.width
+      );
+
+      if (existing) {
+        existing.quantity += newRow.quantity;
+      } else {
+        state.rows.push(newRow);
+      }
+      el.newPalletQty.value = 1;
+      renderControls();
+      scheduleRecalc();
+    }
+
+    function findRowByElement(target) {
+      const tr = target.closest("tr[data-row-id]");
+      if (!tr) return null;
+      const id = Number(tr.dataset.rowId);
+      return state.rows.find((row) => row.id === id) || null;
+    }
+
+    function updateStatus(kind, text) {
+      const dot = el.statusLine.querySelector(".status-dot");
+      dot.className = "status-dot";
+      if (kind === "warn") dot.classList.add("warn");
+      if (kind === "bad") dot.classList.add("bad");
+      el.statusLine.querySelector("span:last-child").textContent = text;
+    }
+
+    function yieldToBrowser() {
+      return new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    function setCalculating(active, text = "Liczenie układu...") {
+      isCalculating = active;
+      document.body.classList.toggle("is-calculating", active);
+      el.recalc.disabled = active;
+      el.alternate.disabled = active;
+      if (el.calcOverlayText) el.calcOverlayText.textContent = text;
+      if (active) {
+        updateStatus("warn", text);
+      }
+    }
+
+    function createSolverWorker() {
+      const source = `
+        const SEARCH_QUALITY = {
+          fast: { label: "Szybki", budgetMs: 900, beamWidth: 120, branchLimit: 36, patternLimit: 360 },
+          deep: { label: "Optymalny", budgetMs: 180000, beamWidth: 2600, branchLimit: 360, patternLimit: 7200 }
+        };
+
+        self.onmessage = (event) => {
+          const { requestId, payload } = event.data || {};
+          if (!requestId || !payload) return;
+          try {
+            const plan = solveLayout(payload, requestId);
+            self.postMessage({ type: "result", requestId, plan });
+          } catch (error) {
+            self.postMessage({ type: "error", requestId, message: error && error.message ? error.message : String(error) });
+          }
+        };
+
+        function nowMs() {
+          return typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+        }
+
+        function clampNumber(value, min, fallback) {
+          const parsed = Number(value);
+          return Math.max(min, Number.isFinite(parsed) ? parsed : fallback);
+        }
+
+        function mixSeed() {
+          let seed = 2166136261;
+          for (const value of arguments) {
+            seed ^= (Math.round(Number(value) || 0) >>> 0);
+            seed = Math.imul(seed, 16777619);
+          }
+          return seed >>> 0;
+        }
+
+        function createRng(seed) {
+          let state = (seed >>> 0) || 1;
+          return () => {
+            state += 0x6D2B79F5;
+            let t = state;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function progress(requestId, message, detail) {
+          self.postMessage({ type: "progress", requestId, message, detail: detail || "" });
+        }
+
+        function expandItems(rows, gap) {
+          const items = [];
+          let index = 0;
+          for (const row of rows) {
+            const quantity = Math.floor(clampNumber(row.quantity, 0, 0));
+            const length = clampNumber(row.length, 1, 1);
+            const width = clampNumber(row.width, 1, 1);
+            const name = String(row.name || "Paleta").trim() || "Paleta";
+            for (let i = 0; i < quantity; i++) {
+              const packLength = length + gap;
+              const packWidth = width + gap;
+              items.push({
+                id: String(row.id) + "-" + (i + 1),
+                rowId: row.id,
+                typeIndex: rows.indexOf(row),
+                itemIndex: i + 1,
+                index: index++,
+                name,
+                length,
+                width,
+                packLength,
+                packWidth,
+                actualArea: length * width,
+                packArea: packLength * packWidth,
+                longSide: Math.max(packLength, packWidth),
+                shortSide: Math.min(packLength, packWidth),
+                color: row.color || "#475569"
+              });
+            }
+          }
+          return items;
+        }
+
+        function getItemOrientations(item, allowRotate) {
+          const orientations = [{
+            rotated: false,
+            packLength: item.packLength,
+            packWidth: item.packWidth,
+            actualLength: item.length,
+            actualWidth: item.width
+          }];
+          if (allowRotate && item.length !== item.width) {
+            orientations.push({
+              rotated: true,
+              packLength: item.packWidth,
+              packWidth: item.packLength,
+              actualLength: item.width,
+              actualWidth: item.length
+            });
+          }
+          return orientations;
+        }
+
+        function intersects(a, b) {
+          return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+        }
+
+        function isContainedIn(a, b) {
+          return a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+        }
+
+        function rangesOverlap(aStart, aSize, bStart, bSize) {
+          return aStart < bStart + bSize && bStart < aStart + aSize;
+        }
+
+        function compareScore(a, b) {
+          for (let i = 0; i < Math.max(a.length, b.length); i++) {
+            const left = a[i] || 0;
+            const right = b[i] || 0;
+            if (left < right) return -1;
+            if (left > right) return 1;
+          }
+          return 0;
+        }
+
+        class MaxRectsBin {
+          constructor(length, width) {
+            this.length = length;
+            this.width = width;
+            this.freeRects = [{ x: 0, y: 0, w: length, h: width }];
+            this.usedRects = [];
+          }
+
+          insert(item, allowRotate, method) {
+            const node = this.findNode(item, allowRotate, method);
+            if (!node) return null;
+            this.placeNode(node);
+            this.usedRects.push(node);
+            return node;
+          }
+
+          findNode(item, allowRotate, method) {
+            let best = null;
+            for (const free of this.freeRects) {
+              for (const orient of getItemOrientations(item, allowRotate)) {
+                if (orient.packLength > free.w || orient.packWidth > free.h) continue;
+                const candidate = {
+                  x: free.x,
+                  y: free.y,
+                  w: orient.packLength,
+                  h: orient.packWidth,
+                  actualLength: orient.actualLength,
+                  actualWidth: orient.actualWidth,
+                  rotated: orient.rotated,
+                  item
+                };
+                const score = this.scoreCandidate(candidate, free, method);
+                if (!best || compareScore(score, best.score) < 0) {
+                  best = { ...candidate, score };
+                }
+              }
+            }
+            return best;
+          }
+
+          scoreCandidate(candidate, free, method) {
+            const leftoverHoriz = Math.abs(free.w - candidate.w);
+            const leftoverVert = Math.abs(free.h - candidate.h);
+            const shortSide = Math.min(leftoverHoriz, leftoverVert);
+            const longSide = Math.max(leftoverHoriz, leftoverVert);
+            const areaFit = free.w * free.h - candidate.w * candidate.h;
+            const contact = this.contactScore(candidate);
+            const lengthEnd = candidate.x + candidate.w;
+            const widthEnd = candidate.y + candidate.h;
+
+            if (method === "areaFit") return [areaFit, shortSide, lengthEnd, -contact];
+            if (method === "bottomLeft") return [lengthEnd, widthEnd, shortSide, areaFit, -contact];
+            if (method === "contact") return [-contact, areaFit, lengthEnd, shortSide];
+            if (method === "longSide") return [longSide, shortSide, areaFit, lengthEnd, -contact];
+            return [shortSide, longSide, areaFit, lengthEnd, -contact];
+          }
+
+          contactScore(node) {
+            let score = 0;
+            if (node.x === 0 || node.x + node.w === this.length) score += node.h;
+            if (node.y === 0 || node.y + node.h === this.width) score += node.w;
+            for (const rect of this.usedRects) {
+              if (rect.x === node.x + node.w || rect.x + rect.w === node.x) {
+                score += Math.max(0, Math.min(rect.y + rect.h, node.y + node.h) - Math.max(rect.y, node.y));
+              }
+              if (rect.y === node.y + node.h || rect.y + rect.h === node.y) {
+                score += Math.max(0, Math.min(rect.x + rect.w, node.x + node.w) - Math.max(rect.x, node.x));
+              }
+            }
+            return score;
+          }
+
+          placeNode(node) {
+            const nextFree = [];
+            for (const free of this.freeRects) {
+              if (!intersects(free, node)) {
+                nextFree.push(free);
+                continue;
+              }
+              if (node.y > free.y) nextFree.push({ x: free.x, y: free.y, w: free.w, h: node.y - free.y });
+              if (node.y + node.h < free.y + free.h) {
+                nextFree.push({ x: free.x, y: node.y + node.h, w: free.w, h: free.y + free.h - (node.y + node.h) });
+              }
+              if (node.x > free.x) nextFree.push({ x: free.x, y: free.y, w: node.x - free.x, h: free.h });
+              if (node.x + node.w < free.x + free.w) {
+                nextFree.push({ x: node.x + node.w, y: free.y, w: free.x + free.w - (node.x + node.w), h: free.h });
+              }
+            }
+            this.freeRects = nextFree.filter((rect) => rect.w > 0 && rect.h > 0);
+            this.pruneFreeList();
+          }
+
+          pruneFreeList() {
+            for (let i = 0; i < this.freeRects.length; i++) {
+              for (let j = i + 1; j < this.freeRects.length; j++) {
+                if (isContainedIn(this.freeRects[i], this.freeRects[j])) {
+                  this.freeRects.splice(i, 1);
+                  i--;
+                  break;
+                }
+                if (isContainedIn(this.freeRects[j], this.freeRects[i])) {
+                  this.freeRects.splice(j, 1);
+                  j--;
+                }
+              }
+            }
+          }
+        }
+
+        function placedFromNode(item, node) {
+          return {
+            id: item.id,
+            rowId: item.rowId,
+            itemIndex: item.itemIndex,
+            name: item.name,
+            color: item.color,
+            x: node.x,
+            y: node.y,
+            packLength: node.w,
+            packWidth: node.h,
+            length: node.actualLength,
+            width: node.actualWidth,
+            originalLength: item.length,
+            originalWidth: item.width,
+            rotated: node.rotated,
+            area: node.actualLength * node.actualWidth
+          };
+        }
+
+        function buildRoundRobinOrder(items, groupSorter, itemSorter) {
+          const map = new Map();
+          for (const item of items) {
+            const group = map.get(item.rowId) || [];
+            group.push(item);
+            map.set(item.rowId, group);
+          }
+          const groups = [...map.values()]
+            .map((group) => group.sort(itemSorter))
+            .sort((a, b) => groupSorter(a[0], b[0]));
+          const ordered = [];
+          let added = true;
+          while (added) {
+            added = false;
+            for (const group of groups) {
+              const item = group.shift();
+              if (item) {
+                ordered.push(item);
+                added = true;
+              }
+            }
+          }
+          return ordered;
+        }
+
+        function makeRandomOrder(items, rng, salt) {
+          return items
+            .map((item) => ({
+              item,
+              rank:
+                item.packArea * (1.4 + rng()) +
+                item.longSide * (80 + rng() * 120) +
+                item.packWidth * (30 + rng() * 80) -
+                item.index * 0.01 +
+                rng() * (800000 + salt)
+            }))
+            .sort((a, b) => b.rank - a.rank)
+            .map((entry) => entry.item);
+        }
+
+        function packOrderedItems(ordered, originalItems, trailer, allowRotate, method, label) {
+          const bin = new MaxRectsBin(trailer.length, trailer.width);
+          const placed = [];
+          const unplaced = [];
+
+          for (const item of ordered) {
+            const node = bin.insert(item, allowRotate, method);
+            if (node) placed.push(placedFromNode(item, node));
+            else unplaced.push(item);
+          }
+
+          const placedIds = new Set(placed.map((item) => item.id));
+          for (const item of originalItems) {
+            if (!placedIds.has(item.id) && !unplaced.some((entry) => entry.id === item.id)) {
+              unplaced.push(item);
+            }
+          }
+
+          return buildPlanResult(placed, unplaced, trailer, label, method, bin.freeRects);
+        }
+
+        function packAdaptiveItems(items, trailer, allowRotate, method, mode) {
+          const remaining = items.slice();
+          const bin = new MaxRectsBin(trailer.length, trailer.width);
+          const placed = [];
+
+          while (remaining.length > 0) {
+            let best = null;
+            for (let index = 0; index < remaining.length; index++) {
+              const item = remaining[index];
+              const node = bin.findNode(item, allowRotate, method);
+              if (!node) continue;
+              const contact = bin.contactScore(node);
+              const endX = node.x + node.w;
+              const endY = node.y + node.h;
+              const waste = (node.score && node.score[0] ? node.score[0] : 0) + (node.score && node.score[1] ? node.score[1] : 0);
+              const score = mode === "dense"
+                ? [endX, waste, endY, -contact, -item.packArea, item.index]
+                : [waste, endX, endY, -contact, -item.packArea, item.index];
+              if (!best || compareScore(score, best.score) < 0) {
+                best = { item, node, index, score };
+              }
+            }
+            if (!best) break;
+            bin.placeNode(best.node);
+            bin.usedRects.push(best.node);
+            placed.push(placedFromNode(best.item, best.node));
+            remaining.splice(best.index, 1);
+          }
+
+          const label = mode === "dense" ? "maxrects adaptacyjny gesty" : "maxrects adaptacyjny dopasowanie";
+          return buildPlanResult(placed, remaining, trailer, label, method, bin.freeRects);
+        }
+
+        function buildMaxRectsCandidates(items, trailer, allowRotate, config, seed, deadline, quality) {
+          const rng = createRng(seed);
+          const areaSort = (a, b) => b.packArea - a.packArea || b.longSide - a.longSide || a.index - b.index;
+          const widthSort = (a, b) => b.packWidth - a.packWidth || b.packArea - a.packArea || a.index - b.index;
+          const lengthSort = (a, b) => b.packLength - a.packLength || b.packArea - a.packArea || a.index - b.index;
+          const typeSort = (a, b) => a.typeIndex - b.typeIndex || areaSort(a, b);
+          const shortSort = (a, b) => b.shortSide - a.shortSide || b.packArea - a.packArea || a.index - b.index;
+          const methods = quality === "deep"
+            ? ["bestShortSide", "areaFit", "contact", "bottomLeft", "longSide"]
+            : ["bestShortSide", "areaFit", "contact", "bottomLeft"];
+          const orders = [
+            { label: "maxrects pole", items: items.slice().sort(areaSort) },
+            { label: "maxrects szerokosc", items: items.slice().sort(widthSort) },
+            { label: "maxrects dlugosc", items: items.slice().sort(lengthSort) },
+            { label: "maxrects krotki bok", items: items.slice().sort(shortSort) },
+            { label: "maxrects typy", items: items.slice().sort(typeSort) },
+            { label: "maxrects mieszane", items: buildRoundRobinOrder(items, areaSort, areaSort) },
+            { label: "maxrects mieszane szerokosc", items: buildRoundRobinOrder(items, widthSort, areaSort) },
+            { label: "maxrects mieszane dlugosc", items: buildRoundRobinOrder(items, lengthSort, areaSort) }
+          ];
+
+          const randomRuns = quality === "deep"
+            ? Math.min(96, Math.max(32, Math.floor(config.beamWidth / 28)))
+            : 4;
+          for (let i = 0; i < randomRuns; i++) {
+            orders.push({ label: "maxrects losowy " + (i + 1), items: makeRandomOrder(items, rng, i * 7919) });
+          }
+
+          const plans = [];
+          for (const method of methods) {
+            if (nowMs() >= deadline) return plans;
+            plans.push(packAdaptiveItems(items, trailer, allowRotate, method, "dense"));
+            if (nowMs() >= deadline) return plans;
+            plans.push(packAdaptiveItems(items, trailer, allowRotate, method, "fit"));
+          }
+          for (const order of orders) {
+            for (const method of methods) {
+              if (nowMs() >= deadline) return plans;
+              plans.push(packOrderedItems(order.items, items, trailer, allowRotate, method, order.label));
+            }
+          }
+          return plans;
+        }
+
+        function compactPlacedItems(placed, trailer) {
+          const compacted = placed.map((item) => ({ ...item }));
+          for (let pass = 0; pass < 8; pass++) {
+            compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+            let moved = false;
+            for (const item of compacted) {
+              let targetX = 0;
+              for (const other of compacted) {
+                if (other === item) continue;
+                if (!rangesOverlap(item.y, item.packWidth, other.y, other.packWidth)) continue;
+                if (other.x + other.packLength <= item.x) {
+                  targetX = Math.max(targetX, other.x + other.packLength);
+                }
+              }
+              targetX = Math.max(0, Math.min(targetX, trailer.length - item.packLength));
+              if (targetX < item.x) {
+                item.x = targetX;
+                moved = true;
+              }
+            }
+
+            compacted.sort((a, b) => a.y - b.y || a.x - b.x);
+            for (const item of compacted) {
+              let targetY = 0;
+              for (const other of compacted) {
+                if (other === item) continue;
+                if (!rangesOverlap(item.x, item.packLength, other.x, other.packLength)) continue;
+                if (other.y + other.packWidth <= item.y) {
+                  targetY = Math.max(targetY, other.y + other.packWidth);
+                }
+              }
+              targetY = Math.max(0, Math.min(targetY, trailer.width - item.packWidth));
+              if (targetY < item.y) {
+                item.y = targetY;
+                moved = true;
+              }
+            }
+            if (!moved) break;
+          }
+          return compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+        }
+
+        function layoutPocketPenalty(placed, trailer) {
+          if (placed.length === 0) return 0;
+          const packUsedLength = placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+          const packArea = placed.reduce((sum, item) => sum + item.packLength * item.packWidth, 0);
+          const activeWaste = Math.max(0, packUsedLength * trailer.width - packArea);
+          let staggerWaste = 0;
+          for (const item of placed) {
+            const rightEdge = item.x + item.packLength;
+            for (const other of placed) {
+              if (other === item) continue;
+              if (other.x <= rightEdge) continue;
+              const overlap = Math.max(0, Math.min(item.y + item.packWidth, other.y + other.packWidth) - Math.max(item.y, other.y));
+              if (overlap > 0) {
+                staggerWaste += (other.x - rightEdge) * overlap;
+                break;
+              }
+            }
+          }
+          return activeWaste + staggerWaste * 0.35;
+        }
+
+        function fixedBottomLeftRepack(items, trailer, label) {
+          const placed = [];
+          for (const source of items) {
+            const yCandidates = [0, Math.max(0, trailer.width - source.packWidth)];
+            for (const other of placed) {
+              if (other.y <= trailer.width - source.packWidth) yCandidates.push(other.y);
+              const afterY = other.y + other.packWidth;
+              if (afterY <= trailer.width - source.packWidth) yCandidates.push(afterY);
+            }
+            const uniqueY = [...new Set(yCandidates.map((value) => Math.round(value)))].sort((a, b) => a - b);
+            let best = null;
+            for (const y of uniqueY) {
+              if (y < 0 || y + source.packWidth > trailer.width) continue;
+              let x = 0;
+              let contact = 0;
+              for (const other of placed) {
+                if (!rangesOverlap(y, source.packWidth, other.y, other.packWidth)) continue;
+                if (other.x + other.packLength > x) x = other.x + other.packLength;
+              }
+              if (x + source.packLength > trailer.length) continue;
+              if (x === 0) contact += source.packWidth;
+              if (y === 0 || y + source.packWidth === trailer.width) contact += source.packLength;
+              for (const other of placed) {
+                if (other.x === x + source.packLength || other.x + other.packLength === x) {
+                  contact += Math.max(0, Math.min(other.y + other.packWidth, y + source.packWidth) - Math.max(other.y, y));
+                }
+                if (other.y === y + source.packWidth || other.y + other.packWidth === y) {
+                  contact += Math.max(0, Math.min(other.x + other.packLength, x + source.packLength) - Math.max(other.x, x));
+                }
+              }
+              const score = [x + source.packLength, x, y, -contact, -source.packLength * source.packWidth];
+              if (!best || compareScore(score, best.score) < 0) {
+                best = { x, y, score };
+              }
+            }
+            if (!best) return null;
+            placed.push({
+              ...source,
+              x: best.x,
+              y: best.y
+            });
+          }
+          return buildPlanResult(placed, [], trailer, label, "bottom-left skyline", []);
+        }
+
+        function buildRepackCandidates(plan, trailer) {
+          if (!plan || plan.placed.length < 2) return [];
+          const base = plan.placed.map((item) => ({ ...item }));
+          const orders = [
+            {
+              label: plan.strategyLabel + " + dosuniecie skyline",
+              items: base.slice().sort((a, b) => a.x - b.x || a.y - b.y)
+            },
+            {
+              label: plan.strategyLabel + " + skyline pole",
+              items: base.slice().sort((a, b) => b.packLength * b.packWidth - a.packLength * a.packWidth || b.packLength - a.packLength || a.x - b.x)
+            },
+            {
+              label: plan.strategyLabel + " + skyline dlugosc",
+              items: base.slice().sort((a, b) => b.packLength - a.packLength || b.packWidth - a.packWidth || a.x - b.x)
+            },
+            {
+              label: plan.strategyLabel + " + skyline szerokosc",
+              items: base.slice().sort((a, b) => b.packWidth - a.packWidth || b.packLength - a.packLength || a.y - b.y)
+            }
+          ];
+          const results = [];
+          for (const order of orders) {
+            const repacked = fixedBottomLeftRepack(order.items, trailer, order.label);
+            if (repacked) {
+              repacked.unplaced = plan.unplaced.slice();
+              results.push(repacked);
+            }
+          }
+          return results;
+        }
+
+        function scoreWorkerPlan(plan, trailer) {
+          const placedCount = plan.placed.length;
+          const packArea = plan.placed.reduce((sum, item) => sum + item.packLength * item.packWidth, 0);
+          const activeArea = Math.max(1, plan.packUsedLength * trailer.width);
+          const density = packArea / activeArea;
+          const pocketPenalty = layoutPocketPenalty(plan.placed, trailer);
+          return placedCount * 1e14 +
+            plan.placedArea * 120 -
+            plan.unplaced.length * 1e13 -
+            plan.packUsedLength * 120000 -
+            pocketPenalty * 140 -
+            plan.packUsedWidth * 8 +
+            density * 1000000;
+        }
+
+        function chooseBestWorkerPlan(plans, trailer) {
+          let best = null;
+          let bestScore = -Infinity;
+          for (const plan of plans) {
+            if (!plan) continue;
+            const score = scoreWorkerPlan(plan, trailer);
+            if (!best || score > bestScore || (
+              Math.abs(score - bestScore) < 1e-6 &&
+              (plan.placed.length > best.placed.length ||
+                (plan.placed.length === best.placed.length && plan.packUsedLength < best.packUsedLength))
+            )) {
+              best = plan;
+              bestScore = score;
+            }
+          }
+          return best;
+        }
+
+        function buildGroups(items) {
+          const map = new Map();
+          for (const item of items) {
+            let group = map.get(item.rowId);
+            if (!group) {
+              group = { rowId: item.rowId, name: item.name, color: item.color, items: [], firstIndex: item.index };
+              map.set(item.rowId, group);
+            }
+            group.items.push(item);
+            group.firstIndex = Math.min(group.firstIndex, item.index);
+          }
+          return [...map.values()].map((group) => {
+            group.items.sort((a, b) => a.index - b.index);
+            group.count = group.items.length;
+            group.prototype = group.items[0];
+            return group;
+          }).sort((a, b) =>
+            b.prototype.actualArea - a.prototype.actualArea ||
+            b.prototype.longSide - a.prototype.longSide ||
+            a.firstIndex - b.firstIndex
+          );
+        }
+
+        function compareTuple(a, b) {
+          for (let i = 0; i < Math.max(a.length, b.length); i++) {
+            const left = a[i] || 0;
+            const right = b[i] || 0;
+            if (left < right) return -1;
+            if (left > right) return 1;
+          }
+          return 0;
+        }
+
+        function generatePatterns(groups, trailer, allowRotate, config, rng, deadline) {
+          const options = [];
+          groups.forEach((group, groupIndex) => {
+            const seen = new Set();
+            for (const orient of getItemOrientations(group.prototype, allowRotate)) {
+              if (orient.packLength > trailer.length || orient.packWidth > trailer.width) continue;
+              const key = orient.packLength + ":" + orient.packWidth;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              options.push({ groupIndex, orient, area: group.prototype.actualArea, jitter: rng() * 1000 });
+            }
+          });
+
+          if (options.length === 0) return [];
+
+          options.sort((a, b) =>
+            b.area - a.area ||
+            b.orient.packWidth - a.orient.packWidth ||
+            b.orient.packLength - a.orient.packLength ||
+            b.jitter - a.jitter ||
+            a.groupIndex - b.groupIndex
+          );
+
+          const minWidth = Math.max(1, Math.min(...options.map((option) => option.orient.packWidth)));
+          const maxItemsPerRow = Math.max(1, Math.min(8, Math.floor(trailer.width / minWidth)));
+          const usage = new Array(groups.length).fill(0);
+          const entries = [];
+          const byKey = new Map();
+
+          const keyOf = () => {
+            const counts = new Map();
+            for (const entry of entries) {
+              const key = entry.groupIndex + ":" + entry.orient.packLength + ":" + entry.orient.packWidth;
+              counts.set(key, (counts.get(key) || 0) + 1);
+            }
+            return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([key, count]) => key + "x" + count).join("|");
+          };
+
+          const consider = (usedWidth, rowLength, area) => {
+            if (entries.length === 0 || rowLength <= 0) return;
+            const typeCounts = new Map();
+            for (const entry of entries) {
+              typeCounts.set(entry.groupIndex, (typeCounts.get(entry.groupIndex) || 0) + 1);
+            }
+            const uniqueTypes = typeCounts.size;
+            const main = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+            const mainType = main[0];
+            const dominance = main[1] / Math.max(1, entries.length);
+            const widthLeft = trailer.width - usedWidth;
+            const density = area / Math.max(1, rowLength * trailer.width);
+            const widthFill = usedWidth / Math.max(1, trailer.width);
+            const mixedBonus = uniqueTypes > 1 ? 1 : 0;
+            const quality =
+              widthFill * 6200 +
+              density * 8200 +
+              entries.length * 260 +
+              mixedBonus * 2600 +
+              uniqueTypes * 680 -
+              dominance * 1250 -
+              rowLength * 0.18 -
+              widthLeft * 0.44 +
+              rng() * 1200;
+            const key = keyOf();
+            if (byKey.has(key)) return;
+            byKey.set(key, {
+              entries: entries.map((entry) => ({ groupIndex: entry.groupIndex, orient: entry.orient })),
+              usage: [...usage],
+              usedWidth,
+              rowLength,
+              area,
+              itemCount: entries.length,
+              uniqueTypes,
+              mainType,
+              dominance,
+              widthLeft,
+              density,
+              quality
+            });
+          };
+
+          const dfs = (startOption, usedWidth, rowLength, area) => {
+            if (nowMs() > deadline || byKey.size >= config.patternLimit) return;
+            consider(usedWidth, rowLength, area);
+            if (entries.length >= maxItemsPerRow) return;
+            for (let optionIndex = startOption; optionIndex < options.length; optionIndex++) {
+              const option = options[optionIndex];
+              if (usage[option.groupIndex] >= groups[option.groupIndex].count) continue;
+              const nextWidth = usedWidth + option.orient.packWidth;
+              const nextLength = Math.max(rowLength, option.orient.packLength);
+              if (nextWidth > trailer.width || nextLength > trailer.length) continue;
+              usage[option.groupIndex]++;
+              entries.push(option);
+              dfs(optionIndex, nextWidth, nextLength, area + option.area);
+              entries.pop();
+              usage[option.groupIndex]--;
+            }
+          };
+
+          dfs(0, 0, 0, 0);
+
+          return [...byKey.values()].sort((a, b) =>
+            b.quality - a.quality ||
+            b.uniqueTypes - a.uniqueTypes ||
+            a.dominance - b.dominance ||
+            b.itemCount - a.itemCount ||
+            a.rowLength - b.rowLength ||
+            a.widthLeft - b.widthLeft
+          ).slice(0, config.patternLimit);
+        }
+
+        function patternFits(pattern, counts) {
+          for (let i = 0; i < pattern.usage.length; i++) {
+            if (pattern.usage[i] > counts[i]) return false;
+          }
+          return true;
+        }
+
+        function subtractCounts(counts, pattern) {
+          const next = counts.slice();
+          for (let i = 0; i < pattern.usage.length; i++) next[i] -= pattern.usage[i];
+          return next;
+        }
+
+        function stateDensity(state, trailer) {
+          return state.placedArea / Math.max(1, state.usedLength * trailer.width);
+        }
+
+        function scoreState(state, trailer, config) {
+          return state.placedCount * 1e12 +
+            state.placedArea * 80 +
+            stateDensity(state, trailer) * 18000 -
+            state.usedLength * 160 -
+            state.widthWaste * 0.65 +
+            state.mixedRows * 2400 -
+            state.repeatPenalty * 2600;
+        }
+
+        function betterState(a, b, trailer, config) {
+          if (!b) return true;
+          if (a.placedCount !== b.placedCount) return a.placedCount > b.placedCount;
+          if (a.usedLength !== b.usedLength) return a.usedLength < b.usedLength;
+          if (Math.abs(stateDensity(a, trailer) - stateDensity(b, trailer)) > 0.005) return stateDensity(a, trailer) > stateDensity(b, trailer);
+          if (a.repeatPenalty !== b.repeatPenalty) return a.repeatPenalty < b.repeatPenalty;
+          return scoreState(a, trailer, config) > scoreState(b, trailer, config);
+        }
+
+        function selectStates(states, trailer, config, rng) {
+          const map = new Map();
+          for (const state of states) {
+            const signature = state.counts.join(",") + "|" + Math.round(state.usedLength / 20) + "|" + (state.lastMainType == null ? "n" : state.lastMainType) + "|" + Math.round(state.repeatPenalty * 2);
+            const score = scoreState(state, trailer, config) + rng() * 500;
+            const current = map.get(signature);
+            if (!current || score > current.score) map.set(signature, { state, score });
+          }
+          return [...map.values()]
+            .sort((a, b) => b.score - a.score || b.state.placedCount - a.state.placedCount || a.state.usedLength - b.state.usedLength)
+            .slice(0, config.beamWidth)
+            .map((entry) => entry.state);
+        }
+
+        function orderRows(rows) {
+          const remaining = rows.slice();
+          const ordered = [];
+          let lastMainType = null;
+          while (remaining.length > 0) {
+            let bestIndex = 0;
+            let bestScore = -Infinity;
+            for (let i = 0; i < remaining.length; i++) {
+              const row = remaining[i];
+              const score =
+                row.density * 3000 +
+                row.uniqueTypes * 900 -
+                row.dominance * 650 -
+                (lastMainType !== null && row.mainType === lastMainType ? 1600 : 0) -
+                row.rowLength * 0.04 -
+                row.widthLeft * 0.16;
+              if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+              }
+            }
+            const row = remaining.splice(bestIndex, 1)[0];
+            ordered.push(row);
+            lastMainType = row.mainType;
+          }
+          return ordered;
+        }
+
+        function buildPlanFromState(state, groups, originalItems, trailer, label) {
+          const pools = groups.map((group) => group.items.slice());
+          const placed = [];
+          let cursorX = 0;
+          for (const pattern of orderRows(state.rows)) {
+            let cursorY = 0;
+            const entries = pattern.entries.slice().sort((a, b) =>
+              b.orient.packLength - a.orient.packLength ||
+              b.orient.packWidth - a.orient.packWidth ||
+              a.groupIndex - b.groupIndex
+            );
+            for (const entry of entries) {
+              const item = pools[entry.groupIndex].shift();
+              if (!item) continue;
+              const orient = entry.orient;
+              placed.push({
+                id: item.id,
+                rowId: item.rowId,
+                itemIndex: item.itemIndex,
+                name: item.name,
+                color: item.color,
+                x: cursorX,
+                y: cursorY,
+                packLength: orient.packLength,
+                packWidth: orient.packWidth,
+                length: orient.actualLength,
+                width: orient.actualWidth,
+                originalLength: item.length,
+                originalWidth: item.width,
+                rotated: orient.rotated,
+                area: orient.actualLength * orient.actualWidth
+              });
+              cursorY += orient.packWidth;
+            }
+            cursorX += pattern.rowLength;
+          }
+          const placedIds = new Set(placed.map((item) => item.id));
+          return buildPlanResult(placed, originalItems.filter((item) => !placedIds.has(item.id)), trailer, label, "worker");
+        }
+
+        function buildPlanResult(placed, unplaced, trailer, strategyLabel, method, freeRects) {
+          const normalizedPlaced = compactPlacedItems(placed, trailer);
+          const placedArea = normalizedPlaced.reduce((sum, item) => sum + item.area, 0);
+          const usedLength = normalizedPlaced.reduce((max, item) => Math.max(max, item.x + item.length), 0);
+          const usedWidth = normalizedPlaced.reduce((max, item) => Math.max(max, item.y + item.width), 0);
+          const packUsedLength = normalizedPlaced.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+          const packUsedWidth = normalizedPlaced.reduce((max, item) => Math.max(max, item.y + item.packWidth), 0);
+          const trailerArea = trailer.length * trailer.width;
+          const freeArea = Array.isArray(freeRects) && freeRects.length > 0
+            ? freeRects.reduce((sum, rect) => sum + rect.w * rect.h, 0)
+            : Math.max(0, trailerArea - placedArea);
+          return {
+            placed: normalizedPlaced,
+            unplaced,
+            placedArea,
+            usedLength,
+            usedWidth,
+            packUsedLength,
+            packUsedWidth,
+            trailerArea,
+            trailerWidth: trailer.width,
+            fill: trailerArea > 0 ? placedArea / trailerArea : 0,
+            freeArea,
+            strategyLabel,
+            method
+          };
+        }
+
+        function solveOneTrailer(items, trailer, allowRotate, config, seed, deadline) {
+          const rng = createRng(seed);
+          const groups = buildGroups(items);
+          const patterns = generatePatterns(groups, trailer, allowRotate, config, rng, deadline);
+          if (patterns.length === 0) return buildPlanResult([], items, trailer, "brak ukladu", "worker");
+
+          let states = [{
+            counts: groups.map((group) => group.count),
+            rows: [],
+            placedCount: 0,
+            placedArea: 0,
+            usedLength: 0,
+            widthWaste: 0,
+            mixedRows: 0,
+            repeatPenalty: 0,
+            lastMainType: null
+          }];
+          let best = states[0];
+          const minRowLength = Math.max(1, Math.min(...patterns.map((pattern) => pattern.rowLength)));
+          const maxRows = Math.min(items.length, Math.ceil(trailer.length / minRowLength) + 2);
+
+          for (let step = 0; step < maxRows && nowMs() < deadline; step++) {
+            const nextStates = [];
+            for (const state of states) {
+              let expanded = 0;
+              for (const pattern of patterns) {
+                if (nowMs() >= deadline) break;
+                if (state.usedLength + pattern.rowLength > trailer.length) continue;
+                if (!patternFits(pattern, state.counts)) continue;
+                const next = {
+                  counts: subtractCounts(state.counts, pattern),
+                  rows: state.rows.concat(pattern),
+                  placedCount: state.placedCount + pattern.itemCount,
+                  placedArea: state.placedArea + pattern.area,
+                  usedLength: state.usedLength + pattern.rowLength,
+                  widthWaste: state.widthWaste + pattern.widthLeft,
+                  mixedRows: state.mixedRows + (pattern.uniqueTypes > 1 ? 1 : 0),
+                  repeatPenalty:
+                    state.repeatPenalty +
+                    (pattern.uniqueTypes === 1 ? 1 : 0) +
+                    (state.lastMainType !== null && state.lastMainType === pattern.mainType ? 1.2 : 0) +
+                    Math.max(0, pattern.dominance - 0.5),
+                  lastMainType: pattern.mainType
+                };
+                nextStates.push(next);
+                if (betterState(next, best, trailer, config)) best = next;
+                expanded++;
+                if (expanded >= config.branchLimit) break;
+              }
+            }
+            if (nextStates.length === 0) break;
+            states = selectStates(nextStates, trailer, config, rng);
+            if (best.placedCount === items.length && config.budgetMs < 20000) break;
+          }
+
+          const rowPlan = buildPlanFromState(best, groups, items, trailer, "worker beam exact-row");
+          const candidates = [rowPlan];
+          candidates.push(...buildRepackCandidates(rowPlan, trailer));
+          const maxRectsPlans = buildMaxRectsCandidates(items, trailer, allowRotate, config, mixSeed(seed, 424242), deadline, config === SEARCH_QUALITY.fast ? "fast" : "deep");
+          candidates.push(...maxRectsPlans);
+          for (const plan of maxRectsPlans.slice(0, 16)) {
+            if (nowMs() >= deadline) break;
+            candidates.push(...buildRepackCandidates(plan, trailer));
+          }
+          const selected = chooseBestWorkerPlan(candidates, trailer) || rowPlan;
+          selected.candidateCount = candidates.length;
+          return selected;
+        }
+
+        function solveLayout(payload, requestId) {
+          const startedAt = nowMs();
+          const quality = payload.searchQuality === "fast" ? "fast" : "deep";
+          const config = SEARCH_QUALITY[quality] || SEARCH_QUALITY.deep;
+          const deadline = startedAt + config.budgetMs;
+          const trailer = payload.trailer;
+          const items = expandItems(payload.rows || [], payload.gap || 0);
+          const placed = [];
+          const trailers = [];
+          const strategyNames = new Set();
+          const methodNames = new Set();
+          let unplaced = items.slice();
+          let placedArea = 0;
+          let totalUsedLength = 0;
+          let maxUsedWidth = 0;
+          let maxCandidateCount = 0;
+          let trailerIndex = 1;
+          const baseSeed = mixSeed(items.length, trailer.length, trailer.width, payload.layoutVariant || 0, payload.gap || 0);
+
+          while (unplaced.length > 0 && nowMs() < deadline) {
+            progress(requestId, "Liczenie naczepy " + trailerIndex + "...");
+            const trailerPlan = solveOneTrailer(unplaced, trailer, payload.allowRotate !== false, config, mixSeed(baseSeed, trailerIndex), deadline);
+            if (!trailerPlan || trailerPlan.placed.length === 0) break;
+            const trailerPlaced = trailerPlan.placed.map((item) => ({ ...item, trailerIndex }));
+            trailers.push({
+              index: trailerIndex,
+              placed: trailerPlaced,
+              usedLength: trailerPlan.usedLength,
+              usedWidth: trailerPlan.usedWidth,
+              packUsedLength: trailerPlan.packUsedLength,
+              packUsedWidth: trailerPlan.packUsedWidth,
+              fill: trailerPlan.fill,
+              placedArea: trailerPlan.placedArea,
+              strategyLabel: trailerPlan.strategyLabel,
+              method: trailerPlan.method
+            });
+            placed.push(...trailerPlaced);
+            placedArea += trailerPlan.placedArea;
+            totalUsedLength += trailerPlan.usedLength;
+            maxUsedWidth = Math.max(maxUsedWidth, trailerPlan.usedWidth);
+            strategyNames.add(trailerPlan.strategyLabel);
+            methodNames.add(trailerPlan.method);
+            maxCandidateCount = Math.max(maxCandidateCount, trailerPlan.candidateCount || 0);
+            unplaced = trailerPlan.unplaced;
+            trailerIndex++;
+          }
+
+          const trailerArea = trailer.length * trailer.width;
+          const trailerCount = trailers.length;
+          return {
+            placed,
+            unplaced,
+            trailers,
+            trailerCount,
+            placedArea,
+            usedLength: totalUsedLength,
+            maxUsedLength: Math.max(0, ...trailers.map((item) => item.usedLength)),
+            usedWidth: maxUsedWidth,
+            packUsedLength: Math.max(0, ...trailers.map((item) => item.packUsedLength)),
+            packUsedWidth: Math.max(0, ...trailers.map((item) => item.packUsedWidth)),
+            trailerArea,
+            fill: trailerCount > 0 && trailerArea > 0 ? placedArea / (trailerArea * trailerCount) : 0,
+            freeArea: Math.max(0, trailerArea * trailerCount - placedArea),
+            strategyLabel: strategyNames.size > 1 ? "worker mieszany" : ([...strategyNames][0] || "Brak"),
+            method: methodNames.size > 1 ? "worker" : ([...methodNames][0] || "none"),
+            candidateCount: maxCandidateCount,
+            variantCount: 1,
+            layoutVariant: Math.max(0, Math.floor(payload.layoutVariant || 0)),
+            searchQuality: quality,
+            searchElapsedMs: nowMs() - startedAt,
+            status: nowMs() >= deadline && unplaced.length > 0 ? "TIME_LIMIT" : "FEASIBLE"
+          };
+        }
+      `;
+      const blob = new Blob([source], { type: "text/javascript" });
+      return new Worker(URL.createObjectURL(blob));
+    }
+
+    function solveWithWorker(payload, token) {
+      return new Promise((resolve, reject) => {
+        if (activeSolverWorker) {
+          activeSolverWorker.terminate();
+          activeSolverWorker = null;
+        }
+
+        const worker = createSolverWorker();
+        activeSolverWorker = worker;
+        const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        worker.onmessage = (event) => {
+          const data = event.data || {};
+          if (data.requestId !== requestId) return;
+          if (data.type === "progress") {
+            if (token === calculationToken) setCalculating(true, data.message || "Liczenie układu...");
+            return;
+          }
+          worker.terminate();
+          if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (data.type === "result") {
+            resolve(data.plan);
+          } else {
+            reject(new Error(data.message || "Solver worker error"));
+          }
+        };
+
+        worker.onerror = (event) => {
+          worker.terminate();
+          if (activeSolverWorker === worker) activeSolverWorker = null;
+          reject(new Error(event.message || "Solver worker error"));
+        };
+
+        worker.postMessage({ requestId, payload });
+      });
+    }
+
+    function createCpSatWorker() {
+      return new Worker(new URL("solver-cpsat-worker.js", window.location.href), { type: "module" });
+    }
+
+    function solveWithCpSatWorker(payload, token) {
+      return new Promise((resolve, reject) => {
+        if (activeSolverWorker) {
+          activeSolverWorker.terminate();
+          activeSolverWorker = null;
+        }
+
+        const worker = createCpSatWorker();
+        activeSolverWorker = worker;
+        const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        worker.onmessage = (event) => {
+          const data = event.data || {};
+          if (data.requestId !== requestId) return;
+          if (data.type === "progress") {
+            if (token === calculationToken) setCalculating(true, data.message || "Liczenie OR-Tools CP-SAT...");
+            return;
+          }
+          worker.terminate();
+          if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (data.type === "result") {
+            resolve(data.plan);
+          } else {
+            reject(new Error(data.message || "OR-Tools CP-SAT worker error"));
+          }
+        };
+
+        worker.onerror = (event) => {
+          worker.terminate();
+          if (activeSolverWorker === worker) activeSolverWorker = null;
+          reject(new Error(event.message || "OR-Tools CP-SAT worker error"));
+        };
+
+        worker.postMessage({ requestId, payload });
+      });
+    }
+
+    function resetLayoutVariant() {
+      state.layoutVariant = 0;
+    }
+
+    function scheduleRecalc(resetVariant = true) {
+      if (resetVariant) resetLayoutVariant();
+      clearTimeout(recalcTimer);
+      recalcTimer = setTimeout(() => {
+        readGlobalInputs();
+        saveState();
+        calculateAndRender({ auto: true });
+      }, 90);
+    }
+
+    function expandItems(rows, gap) {
+      const items = [];
+      let index = 0;
+      for (const row of rows) {
+        const quantity = Math.floor(clampNumber(row.quantity, 0, 0));
+        const length = clampNumber(row.length, 1, 1);
+        const width = clampNumber(row.width, 1, 1);
+        const name = row.name.trim() || "Paleta";
+        for (let i = 0; i < quantity; i++) {
+          const packLength = length + gap;
+          const packWidth = width + gap;
+          items.push({
+            id: `${row.id}-${i + 1}`,
+            rowId: row.id,
+            typeIndex: state.rows.indexOf(row),
+            itemIndex: i + 1,
+            index: index++,
+            name,
+            length,
+            width,
+            packLength,
+            packWidth,
+            packArea: packLength * packWidth,
+            actualArea: length * width,
+            longSide: Math.max(packLength, packWidth),
+            shortSide: Math.min(packLength, packWidth),
+            color: row.color
+          });
+        }
+      }
+      return items;
+    }
+
+    function isContainedIn(a, b) {
+      return a.x >= b.x &&
+        a.y >= b.y &&
+        a.x + a.w <= b.x + b.w &&
+        a.y + a.h <= b.y + b.h;
+    }
+
+    function intersects(a, b) {
+      return !(b.x >= a.x + a.w ||
+        b.x + b.w <= a.x ||
+        b.y >= a.y + a.h ||
+        b.y + b.h <= a.y);
+    }
+
+    class MaxRectsBin {
+      constructor(length, width) {
+        this.length = length;
+        this.width = width;
+        this.freeRects = [{ x: 0, y: 0, w: length, h: width }];
+        this.usedRects = [];
+      }
+
+      insert(item, allowRotate, method) {
+        const node = this.findNode(item, allowRotate, method);
+        if (!node) return null;
+        this.placeNode(node);
+        this.usedRects.push(node);
+        return node;
+      }
+
+      findNode(item, allowRotate, method) {
+        let best = null;
+        for (const free of this.freeRects) {
+          const orientations = [
+            {
+              rotated: false,
+              packLength: item.packLength,
+              packWidth: item.packWidth,
+              actualLength: item.length,
+              actualWidth: item.width
+            }
+          ];
+          if (allowRotate && item.length !== item.width) {
+            orientations.push({
+              rotated: true,
+              packLength: item.packWidth,
+              packWidth: item.packLength,
+              actualLength: item.width,
+              actualWidth: item.length
+            });
+          }
+
+          for (const orient of orientations) {
+            if (orient.packLength > free.w || orient.packWidth > free.h) continue;
+            const candidate = {
+              x: free.x,
+              y: free.y,
+              w: orient.packLength,
+              h: orient.packWidth,
+              actualLength: orient.actualLength,
+              actualWidth: orient.actualWidth,
+              rotated: orient.rotated,
+              item
+            };
+            const [scoreA, scoreB] = this.scoreCandidate(candidate, free, method);
+            if (!best || scoreA < best.scoreA || (scoreA === best.scoreA && scoreB < best.scoreB)) {
+              best = { ...candidate, scoreA, scoreB };
+            }
+          }
+        }
+        return best;
+      }
+
+      scoreCandidate(candidate, free, method) {
+        const leftoverHoriz = Math.abs(free.w - candidate.w);
+        const leftoverVert = Math.abs(free.h - candidate.h);
+        const shortSide = Math.min(leftoverHoriz, leftoverVert);
+        const longSide = Math.max(leftoverHoriz, leftoverVert);
+        const areaFit = free.w * free.h - candidate.w * candidate.h;
+
+        if (method === "areaFit") return [areaFit, shortSide];
+        if (method === "bottomLeft") return [candidate.y + candidate.h, candidate.x];
+        if (method === "contact") return [-this.contactScore(candidate), areaFit];
+        return [shortSide, longSide];
+      }
+
+      contactScore(node) {
+        let score = 0;
+        if (node.x === 0 || node.x + node.w === this.length) score += node.h;
+        if (node.y === 0 || node.y + node.h === this.width) score += node.w;
+        for (const rect of this.usedRects) {
+          if (rect.x === node.x + node.w || rect.x + rect.w === node.x) {
+            const overlap = Math.max(0, Math.min(rect.y + rect.h, node.y + node.h) - Math.max(rect.y, node.y));
+            score += overlap;
+          }
+          if (rect.y === node.y + node.h || rect.y + rect.h === node.y) {
+            const overlap = Math.max(0, Math.min(rect.x + rect.w, node.x + node.w) - Math.max(rect.x, node.x));
+            score += overlap;
+          }
+        }
+        return score;
+      }
+
+      placeNode(node) {
+        const nextFree = [];
+        for (const free of this.freeRects) {
+          if (!intersects(free, node)) {
+            nextFree.push(free);
+            continue;
+          }
+
+          if (node.y > free.y) {
+            nextFree.push({ x: free.x, y: free.y, w: free.w, h: node.y - free.y });
+          }
+          if (node.y + node.h < free.y + free.h) {
+            nextFree.push({
+              x: free.x,
+              y: node.y + node.h,
+              w: free.w,
+              h: free.y + free.h - (node.y + node.h)
+            });
+          }
+          if (node.x > free.x) {
+            nextFree.push({ x: free.x, y: free.y, w: node.x - free.x, h: free.h });
+          }
+          if (node.x + node.w < free.x + free.w) {
+            nextFree.push({
+              x: node.x + node.w,
+              y: free.y,
+              w: free.x + free.w - (node.x + node.w),
+              h: free.h
+            });
+          }
+        }
+        this.freeRects = nextFree.filter((rect) => rect.w > 0 && rect.h > 0);
+        this.pruneFreeList();
+      }
+
+      pruneFreeList() {
+        for (let i = 0; i < this.freeRects.length; i++) {
+          for (let j = i + 1; j < this.freeRects.length; j++) {
+            if (isContainedIn(this.freeRects[i], this.freeRects[j])) {
+              this.freeRects.splice(i, 1);
+              i--;
+              break;
+            }
+            if (isContainedIn(this.freeRects[j], this.freeRects[i])) {
+              this.freeRects.splice(j, 1);
+              j--;
+            }
+          }
+        }
+      }
+    }
+
+    function packOrderedItems(ordered, trailer, allowRotate, strategyLabel, method) {
+      const bin = new MaxRectsBin(trailer.length, trailer.width);
+      const placed = [];
+      const unplaced = [];
+
+      for (const item of ordered) {
+        const node = bin.insert(item, allowRotate, method);
+        if (node) {
+          placed.push({
+            id: item.id,
+            rowId: item.rowId,
+            itemIndex: item.itemIndex,
+            name: item.name,
+            color: item.color,
+            x: node.x,
+            y: node.y,
+            packLength: node.w,
+            packWidth: node.h,
+            length: node.actualLength,
+            width: node.actualWidth,
+            originalLength: item.length,
+            originalWidth: item.width,
+            rotated: node.rotated,
+            area: node.actualLength * node.actualWidth
+          });
+        } else {
+          unplaced.push(item);
+        }
+      }
+
+      return buildPlanResult(placed, unplaced, trailer, strategyLabel, method, bin.freeRects);
+    }
+
+    function packItems(items, trailer, allowRotate, orderStrategy, method) {
+      const ordered = [...items].sort(orderStrategy.sort);
+      return packOrderedItems(ordered, trailer, allowRotate, orderStrategy.label, method);
+    }
+
+    function buildRoundRobinOrder(items, groupSorter, itemSorter) {
+      const groupsMap = new Map();
+      for (const item of items) {
+        const group = groupsMap.get(item.rowId) || [];
+        group.push(item);
+        groupsMap.set(item.rowId, group);
+      }
+      const groups = [...groupsMap.values()]
+        .map((group) => group.sort(itemSorter))
+        .sort((a, b) => groupSorter(a[0], b[0]));
+      const ordered = [];
+      let added = true;
+      while (added) {
+        added = false;
+        for (const group of groups) {
+          const item = group.shift();
+          if (item) {
+            ordered.push(item);
+            added = true;
+          }
+        }
+      }
+      return ordered;
+    }
+
+    function packItemsRoundRobin(items, trailer, allowRotate, method, mode) {
+      const areaSort = (a, b) => b.packArea - a.packArea || b.longSide - a.longSide || a.index - b.index;
+      const widthSort = (a, b) => b.packWidth - a.packWidth || b.packArea - a.packArea || a.index - b.index;
+      const ordered = mode === "width"
+        ? buildRoundRobinOrder(items, widthSort, areaSort)
+        : buildRoundRobinOrder(items, areaSort, areaSort);
+      const label = mode === "width" ? "mieszana szerokością" : "mieszana rozmiarami";
+      return packOrderedItems(ordered, trailer, allowRotate, label, method);
+    }
+
+    function sameFootprintItems(items) {
+      if (items.length === 0) return false;
+      const first = items[0];
+      return items.every((item) =>
+        item.rowId === first.rowId &&
+        item.length === first.length &&
+        item.width === first.width
+      );
+    }
+
+    function getItemOrientations(item, allowRotate) {
+      const orientations = [
+        {
+          rotated: false,
+          packLength: item.packLength,
+          packWidth: item.packWidth,
+          actualLength: item.length,
+          actualWidth: item.width
+        }
+      ];
+      if (allowRotate && item.length !== item.width) {
+        orientations.push({
+          rotated: true,
+          packLength: item.packWidth,
+          packWidth: item.packLength,
+          actualLength: item.width,
+          actualWidth: item.length
+        });
+      }
+      return orientations;
+    }
+
+    function packIdenticalItemsGrid(items, trailer, allowRotate) {
+      if (!sameFootprintItems(items)) return null;
+      const first = items[0];
+      let best = null;
+
+      for (const orient of getItemOrientations(first, allowRotate)) {
+        const columns = Math.floor(trailer.width / orient.packWidth);
+        const rows = Math.floor(trailer.length / orient.packLength);
+        if (columns <= 0 || rows <= 0) continue;
+        const capacity = columns * rows;
+        const placedCount = Math.min(items.length, capacity);
+        if (placedCount <= 0) continue;
+        const usedRows = Math.ceil(placedCount / columns);
+        const usedWidth = Math.min(columns, placedCount) * orient.packWidth;
+        const usedLength = usedRows * orient.packLength;
+        const placedArea = placedCount * first.actualArea;
+        const density = placedArea / Math.max(1, usedLength * trailer.width);
+        const score = [
+          -placedCount,
+          usedLength,
+          -columns,
+          -density,
+          trailer.width - usedWidth,
+          orient.rotated ? 0 : 1
+        ];
+
+        if (!best || compareScore(score, best.score) < 0) {
+          best = { orient, columns, placedCount, score };
+        }
+      }
+
+      if (!best) return null;
+
+      const placed = [];
+      for (let index = 0; index < best.placedCount; index++) {
+        const item = items[index];
+        const col = index % best.columns;
+        const row = Math.floor(index / best.columns);
+        placed.push({
+          id: item.id,
+          rowId: item.rowId,
+          itemIndex: item.itemIndex,
+          name: item.name,
+          color: item.color,
+          x: row * best.orient.packLength,
+          y: col * best.orient.packWidth,
+          packLength: best.orient.packLength,
+          packWidth: best.orient.packWidth,
+          length: best.orient.actualLength,
+          width: best.orient.actualWidth,
+          originalLength: item.length,
+          originalWidth: item.width,
+          rotated: best.orient.rotated,
+          area: best.orient.actualLength * best.orient.actualWidth
+        });
+      }
+
+      return buildPlanResult(placed, items.slice(best.placedCount), trailer, "siatka jednego typu", "grid", []);
+    }
+
+    function buildBeamGroups(items) {
+      const map = new Map();
+      for (const item of items) {
+        let group = map.get(item.rowId);
+        if (!group) {
+          group = {
+            rowId: item.rowId,
+            typeIndex: item.typeIndex,
+            name: item.name,
+            color: item.color,
+            firstIndex: item.index,
+            items: []
+          };
+          map.set(item.rowId, group);
+        }
+        group.firstIndex = Math.min(group.firstIndex, item.index);
+        group.items.push(item);
+      }
+
+      return [...map.values()]
+        .map((group) => {
+          group.items.sort((a, b) => a.index - b.index);
+          group.count = group.items.length;
+          group.prototype = group.items[0];
+          return group;
+        })
+        .sort((a, b) =>
+          b.prototype.actualArea - a.prototype.actualArea ||
+          b.prototype.longSide - a.prototype.longSide ||
+          a.firstIndex - b.firstIndex
+        );
+    }
+
+    function generateBeamRowPatterns(groups, trailer, allowRotate, profile = {}) {
+      if (groups.length === 0 || groups.length > 14) return [];
+
+      const deadline = profile.deadline || Infinity;
+      const rng = profile.seed ? createRng(profile.seed) : null;
+      const optionJitter = profile.optionJitter || 0;
+      const patternJitter = profile.patternJitter || 0;
+      const options = [];
+      groups.forEach((group, groupIndex) => {
+        const seen = new Set();
+        for (const orient of getItemOrientations(group.prototype, allowRotate)) {
+          if (orient.packLength > trailer.length || orient.packWidth > trailer.width) continue;
+          const key = `${orient.packLength}:${orient.packWidth}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          options.push({
+            groupIndex,
+            orient: { ...orient },
+            actualArea: group.prototype.actualArea,
+            optionKey: `${groupIndex}:${key}`,
+            rankJitter: rng ? rng() * optionJitter : 0
+          });
+        }
+      });
+
+      if (options.length === 0) return [];
+
+      options.sort((a, b) =>
+        b.actualArea - a.actualArea ||
+        b.orient.packWidth - a.orient.packWidth ||
+        b.orient.packLength - a.orient.packLength ||
+        b.rankJitter - a.rankJitter ||
+        a.groupIndex - b.groupIndex
+      );
+
+      const minWidth = Math.max(1, Math.min(...options.map((option) => option.orient.packWidth)));
+      const maxItemsPerRow = Math.max(1, Math.min(6, Math.floor(trailer.width / minWidth)));
+      const patternsByKey = new Map();
+      const usage = new Array(groups.length).fill(0);
+      const entries = [];
+      const patternSearchLimit = profile.patternLimit || 1800;
+
+      const patternKey = () => {
+        const counts = new Map();
+        for (const entry of entries) {
+          counts.set(entry.optionKey, (counts.get(entry.optionKey) || 0) + 1);
+        }
+        return [...counts.entries()]
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([key, count]) => `${key}x${count}`)
+          .join("|");
+      };
+
+      const consider = (usedWidth, rowLength, area) => {
+        if (entries.length === 0 || rowLength <= 0) return;
+        const typeCounts = new Map();
+        for (const entry of entries) {
+          typeCounts.set(entry.groupIndex, (typeCounts.get(entry.groupIndex) || 0) + 1);
+        }
+        const uniqueTypes = typeCounts.size;
+        const [mainType, mainTypeCount] = [...typeCounts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+        const dominance = mainTypeCount / Math.max(1, entries.length);
+        const widthLeft = trailer.width - usedWidth;
+        const density = area / Math.max(1, rowLength * trailer.width);
+        const widthFill = usedWidth / Math.max(1, trailer.width);
+        const mixedBonus = uniqueTypes > 1 ? 1 : 0;
+        const quality =
+          widthFill * 4200 +
+          density * 5400 +
+          entries.length * 180 +
+          mixedBonus * 1500 +
+          uniqueTypes * 420 -
+          dominance * 900 -
+          rowLength * 0.24 -
+          widthLeft * 0.42 +
+          (rng ? rng() * patternJitter : 0);
+        const key = patternKey();
+        if (patternsByKey.has(key)) return;
+        patternsByKey.set(key, {
+          entries: entries.map((entry) => ({
+            groupIndex: entry.groupIndex,
+            orient: { ...entry.orient }
+          })),
+          usage: [...usage],
+          usedWidth,
+          rowLength,
+          area,
+          itemCount: entries.length,
+          uniqueTypes,
+          mainType,
+          dominance,
+          widthLeft,
+          density,
+          quality
+        });
+      };
+
+      const dfs = (startOption, usedWidth, rowLength, area) => {
+        if (nowMs() > deadline) return;
+        consider(usedWidth, rowLength, area);
+        if (entries.length >= maxItemsPerRow || patternsByKey.size >= patternSearchLimit) return;
+
+        for (let optionIndex = startOption; optionIndex < options.length; optionIndex++) {
+          const option = options[optionIndex];
+          if (usage[option.groupIndex] >= groups[option.groupIndex].count) continue;
+          const nextWidth = usedWidth + option.orient.packWidth;
+          const nextLength = Math.max(rowLength, option.orient.packLength);
+          if (nextWidth > trailer.width || nextLength > trailer.length) continue;
+
+          usage[option.groupIndex]++;
+          entries.push(option);
+          dfs(optionIndex, nextWidth, nextLength, area + option.actualArea);
+          entries.pop();
+          usage[option.groupIndex]--;
+        }
+      };
+
+      dfs(0, 0, 0, 0);
+
+      return [...patternsByKey.values()]
+        .sort((a, b) =>
+          b.quality - a.quality ||
+          b.uniqueTypes - a.uniqueTypes ||
+          a.dominance - b.dominance ||
+          b.itemCount - a.itemCount ||
+          a.rowLength - b.rowLength ||
+          a.widthLeft - b.widthLeft
+        )
+        .slice(0, groups.length > 10 ? 280 : 480);
+    }
+
+    function patternFitsCounts(pattern, counts) {
+      for (let i = 0; i < pattern.usage.length; i++) {
+        if (pattern.usage[i] > counts[i]) return false;
+      }
+      return true;
+    }
+
+    function subtractPatternCounts(counts, pattern) {
+      const next = counts.slice();
+      for (let i = 0; i < pattern.usage.length; i++) {
+        next[i] -= pattern.usage[i];
+      }
+      return next;
+    }
+
+    function beamDensity(state, trailer) {
+      return state.placedArea / Math.max(1, state.usedLength * trailer.width);
+    }
+
+    function scoreBeamState(state, trailer, profile) {
+      return state.placedCount * 1e10 +
+        state.placedArea * 45 +
+        beamDensity(state, trailer) * profile.densityWeight -
+        state.usedLength * profile.lengthWeight -
+        state.widthWaste * profile.wasteWeight +
+        state.mixedRows * profile.mixWeight -
+        state.repeatPenalty * (profile.repeatWeight || 800);
+    }
+
+    function isBetterBeamState(candidate, best, trailer, profile) {
+      if (!best) return true;
+      if (candidate.placedCount !== best.placedCount) return candidate.placedCount > best.placedCount;
+      if (candidate.placedArea !== best.placedArea) return candidate.placedArea > best.placedArea;
+
+      const densityDiff = beamDensity(candidate, trailer) - beamDensity(best, trailer);
+      if (Math.abs(densityDiff) > 0.006) return densityDiff > 0;
+      if (candidate.usedLength !== best.usedLength) return candidate.usedLength < best.usedLength;
+      if (candidate.widthWaste !== best.widthWaste) return candidate.widthWaste < best.widthWaste;
+      if (candidate.mixedRows !== best.mixedRows) return candidate.mixedRows > best.mixedRows;
+      return scoreBeamState(candidate, trailer, profile) > scoreBeamState(best, trailer, profile);
+    }
+
+    function selectBeamStates(states, trailer, profile) {
+      const bySignature = new Map();
+      for (const state of states) {
+        const signature = `${state.counts.join(",")}|${Math.round(state.usedLength / 20)}|${state.lastMainType ?? "n"}|${Math.round(state.repeatPenalty * 2)}`;
+        const score = scoreBeamState(state, trailer, profile) + (profile.rng ? profile.rng() * (profile.stateJitter || 0) : 0);
+        const current = bySignature.get(signature);
+        if (!current || score > current.score) {
+          bySignature.set(signature, { state, score });
+        }
+      }
+
+      return [...bySignature.values()]
+        .sort((a, b) =>
+          b.score - a.score ||
+          b.state.placedCount - a.state.placedCount ||
+          a.state.usedLength - b.state.usedLength
+        )
+        .slice(0, profile.beamWidth)
+        .map((entry) => entry.state);
+    }
+
+    function reorderBeamRows(rows) {
+      const remaining = rows.slice();
+      const ordered = [];
+      let lastMainType = null;
+
+      while (remaining.length > 0) {
+        let bestIndex = 0;
+        let bestScore = -Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+          const row = remaining[i];
+          const score =
+            row.density * 2400 +
+            row.uniqueTypes * 700 -
+            row.dominance * 750 -
+            (lastMainType !== null && row.mainType === lastMainType ? 1600 : 0) -
+            row.rowLength * 0.08 -
+            row.widthLeft * 0.28;
+          if (score > bestScore) {
+            bestScore = score;
+            bestIndex = i;
+          }
+        }
+        const [row] = remaining.splice(bestIndex, 1);
+        ordered.push(row);
+        lastMainType = row.mainType;
+      }
+
+      return ordered;
+    }
+
+    function buildBeamPlanFromState(state, groups, items, trailer, profile) {
+      const pools = groups.map((group) => group.items.slice());
+      const placed = [];
+      let cursorX = 0;
+
+      for (const pattern of reorderBeamRows(state.rows)) {
+        let cursorY = 0;
+        const rowEntries = pattern.entries
+          .slice()
+          .sort((a, b) =>
+            b.orient.packLength - a.orient.packLength ||
+            b.orient.packWidth - a.orient.packWidth ||
+            a.groupIndex - b.groupIndex
+          );
+
+        for (const entry of rowEntries) {
+          const item = pools[entry.groupIndex].shift();
+          if (!item) continue;
+          const orient = entry.orient;
+          placed.push({
+            id: item.id,
+            rowId: item.rowId,
+            itemIndex: item.itemIndex,
+            name: item.name,
+            color: item.color,
+            x: cursorX,
+            y: cursorY,
+            packLength: orient.packLength,
+            packWidth: orient.packWidth,
+            length: orient.actualLength,
+            width: orient.actualWidth,
+            originalLength: item.length,
+            originalWidth: item.width,
+            rotated: orient.rotated,
+            area: orient.actualLength * orient.actualWidth
+          });
+          cursorY += orient.packWidth;
+        }
+
+        cursorX += pattern.rowLength;
+      }
+
+      const placedIds = new Set(placed.map((item) => item.id));
+      const unplaced = items.filter((item) => !placedIds.has(item.id));
+      return buildPlanResult(placed, unplaced, trailer, profile.label, "beam", []);
+    }
+
+    function packItemsByRowBeam(items, trailer, allowRotate, profile) {
+      const beamProfile = {
+        ...profile,
+        rng: profile.seed ? createRng(mixSeed(profile.seed, 99173)) : null
+      };
+      const groups = buildBeamGroups(items);
+      const patterns = generateBeamRowPatterns(groups, trailer, allowRotate, beamProfile);
+      if (patterns.length === 0) {
+        return buildPlanResult([], items, trailer, beamProfile.label, "beam", []);
+      }
+
+      const initialState = {
+        counts: groups.map((group) => group.count),
+        rows: [],
+        placedCount: 0,
+        placedArea: 0,
+        usedLength: 0,
+        widthWaste: 0,
+        mixedRows: 0,
+        repeatPenalty: 0,
+        lastMainType: null
+      };
+      let states = [initialState];
+      let bestState = initialState;
+      const minRowLength = Math.max(1, Math.min(...patterns.map((pattern) => pattern.rowLength)));
+      const maxRows = Math.min(items.length, Math.ceil(trailer.length / minRowLength) + 1);
+
+      for (let step = 0; step < maxRows; step++) {
+        if (nowMs() > (beamProfile.deadline || Infinity)) break;
+        const nextStates = [];
+
+        for (const state of states) {
+          let expanded = 0;
+          for (const pattern of patterns) {
+            if (nowMs() > (beamProfile.deadline || Infinity)) break;
+            if (state.usedLength + pattern.rowLength > trailer.length) continue;
+            if (!patternFitsCounts(pattern, state.counts)) continue;
+
+            const nextState = {
+              counts: subtractPatternCounts(state.counts, pattern),
+              rows: state.rows.concat(pattern),
+              placedCount: state.placedCount + pattern.itemCount,
+              placedArea: state.placedArea + pattern.area,
+              usedLength: state.usedLength + pattern.rowLength,
+              widthWaste: state.widthWaste + pattern.widthLeft,
+              mixedRows: state.mixedRows + (pattern.uniqueTypes > 1 ? 1 : 0),
+              repeatPenalty:
+                state.repeatPenalty +
+                (pattern.uniqueTypes === 1 ? 1 : 0) +
+                (state.lastMainType !== null && state.lastMainType === pattern.mainType ? 1.35 : 0) +
+                Math.max(0, pattern.dominance - 0.5),
+              lastMainType: pattern.mainType
+            };
+            nextStates.push(nextState);
+            if (isBetterBeamState(nextState, bestState, trailer, profile)) {
+              bestState = nextState;
+            }
+            expanded++;
+            if (expanded >= profile.branchLimit) break;
+          }
+        }
+
+        if (nextStates.length === 0) break;
+        states = selectBeamStates(nextStates, trailer, beamProfile);
+        if (!beamProfile.exhaustive && bestState.placedCount === items.length && states.every((state) => state.placedCount === items.length)) {
+          break;
+        }
+      }
+
+      return buildBeamPlanFromState(bestState, groups, items, trailer, beamProfile);
+    }
+
+    function packItemsRows(items, trailer, allowRotate, mode) {
+      const remaining = [...items];
+      const placed = [];
+      let cursorX = 0;
+
+      while (remaining.length > 0) {
+        const row = findBestPackingRow(remaining, trailer, allowRotate, cursorX, mode);
+        if (!row || row.entries.length === 0) break;
+
+        let cursorY = 0;
+        for (const entry of row.entries) {
+          const item = entry.item;
+          const orient = entry.orient;
+          placed.push({
+            id: item.id,
+            rowId: item.rowId,
+            itemIndex: item.itemIndex,
+            name: item.name,
+            color: item.color,
+            x: cursorX,
+            y: cursorY,
+            packLength: orient.packLength,
+            packWidth: orient.packWidth,
+            length: orient.actualLength,
+            width: orient.actualWidth,
+            originalLength: item.length,
+            originalWidth: item.width,
+            rotated: orient.rotated,
+            area: orient.actualLength * orient.actualWidth
+          });
+          cursorY += orient.packWidth;
+        }
+
+        for (const index of row.indices.sort((a, b) => b - a)) {
+          remaining.splice(index, 1);
+        }
+        cursorX += row.rowLength;
+      }
+
+      const usedKeys = new Set(placed.map((item) => item.id));
+      const unplaced = items.filter((item) => !usedKeys.has(item.id));
+      const label = mode === "dense" ? "rzędowa gęsta" : "rzędowa szerokością";
+      return buildPlanResult(placed, unplaced, trailer, label, "rows", []);
+    }
+
+    function findBestPackingRowBySearch(remaining, trailer, allowRotate, startX, mode) {
+      const maxRowLength = trailer.length - startX;
+      const candidateLimit = Math.min(remaining.length, 30);
+      const candidates = remaining
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => getItemOrientations(item, allowRotate).some((orient) => orient.packLength <= maxRowLength && orient.packWidth <= trailer.width))
+        .sort((a, b) => b.item.packArea - a.item.packArea || b.item.packWidth - a.item.packWidth || a.item.index - b.item.index)
+        .slice(0, candidateLimit);
+
+      if (candidates.length === 0) return null;
+
+      const minWidth = Math.max(1, Math.min(...candidates.flatMap(({ item }) => getItemOrientations(item, allowRotate).map((orient) => orient.packWidth))));
+      const maxItemsPerRow = Math.max(1, Math.min(6, Math.floor(trailer.width / minWidth)));
+      let bestRow = null;
+
+      const scoreRow = (entries, usedWidth, rowLength, area) => {
+        const uniqueTypes = new Set(entries.map((entry) => entry.item.rowId)).size;
+        const widthLeft = trailer.width - usedWidth;
+        const widthBucket = Math.ceil(widthLeft / 120);
+        const density = area / Math.max(1, rowLength * trailer.width);
+        const mixedBonus = uniqueTypes > 1 ? 1 : 0;
+        if (mode === "dense") {
+          return [widthBucket, -mixedBonus, -uniqueTypes, -density, widthLeft, rowLength, -entries.length];
+        }
+        return [widthBucket, -mixedBonus, -uniqueTypes, widthLeft, rowLength, -density, -entries.length];
+      };
+
+      const consider = (entries, usedWidth, rowLength, area) => {
+        if (entries.length === 0) return;
+        const indices = entries.map((entry) => entry.index);
+        const score = scoreRow(entries, usedWidth, rowLength, area);
+        if (!bestRow || compareScore(score, bestRow.score) < 0) {
+          bestRow = {
+            entries: entries.map((entry) => ({ item: entry.item, orient: entry.orient })),
+            indices,
+            usedWidth,
+            rowLength,
+            area,
+            score
+          };
+        }
+      };
+
+      const dfs = (startCandidate, entries, usedIndices, usedWidth, rowLength, area) => {
+        consider(entries, usedWidth, rowLength, area);
+        if (entries.length >= maxItemsPerRow) return;
+
+        for (let candidateIndex = startCandidate; candidateIndex < candidates.length; candidateIndex++) {
+          const candidate = candidates[candidateIndex];
+          if (usedIndices.has(candidate.index)) continue;
+          for (const orient of getItemOrientations(candidate.item, allowRotate)) {
+            const nextWidth = usedWidth + orient.packWidth;
+            const nextLength = Math.max(rowLength, orient.packLength);
+            if (nextWidth > trailer.width || nextLength > maxRowLength) continue;
+            usedIndices.add(candidate.index);
+            entries.push({ item: candidate.item, orient, index: candidate.index });
+            dfs(candidateIndex + 1, entries, usedIndices, nextWidth, nextLength, area + candidate.item.actualArea);
+            entries.pop();
+            usedIndices.delete(candidate.index);
+          }
+        }
+      };
+
+      dfs(0, [], new Set(), 0, 0, 0);
+      return bestRow;
+    }
+
+    function findBestPackingRow(remaining, trailer, allowRotate, startX, mode) {
+      const searchedRow = findBestPackingRowBySearch(remaining, trailer, allowRotate, startX, mode);
+      if (searchedRow) return searchedRow;
+
+      const maxRowLength = trailer.length - startX;
+      let bestRow = null;
+      const seedCandidates = remaining
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => b.item.packArea - a.item.packArea || b.item.packWidth - a.item.packWidth || a.item.index - b.item.index)
+        .slice(0, Math.min(remaining.length, 80));
+
+      for (const seed of seedCandidates) {
+        for (const seedOrient of getItemOrientations(seed.item, allowRotate)) {
+          if (seedOrient.packLength > maxRowLength || seedOrient.packWidth > trailer.width) continue;
+          const row = {
+            entries: [{ item: seed.item, orient: seedOrient }],
+            indices: [seed.index],
+            usedWidth: seedOrient.packWidth,
+            rowLength: seedOrient.packLength,
+            area: seed.item.actualArea || seed.item.packArea
+          };
+          const used = new Set([seed.index]);
+
+          while (true) {
+            let bestNext = null;
+            for (let index = 0; index < remaining.length; index++) {
+              if (used.has(index)) continue;
+              const item = remaining[index];
+              for (const orient of getItemOrientations(item, allowRotate)) {
+                const nextWidth = row.usedWidth + orient.packWidth;
+                const nextLength = Math.max(row.rowLength, orient.packLength);
+                if (nextWidth > trailer.width || nextLength > maxRowLength) continue;
+                const widthLeft = trailer.width - nextWidth;
+                const lengthIncrease = nextLength - row.rowLength;
+                const density = (row.area + item.actualArea) / Math.max(1, nextLength * trailer.width);
+                const score = mode === "dense"
+                  ? [-density, widthLeft, lengthIncrease, -item.packArea, item.index]
+                  : [widthLeft, lengthIncrease, -item.packArea, item.index];
+                if (!bestNext || compareScore(score, bestNext.score) < 0) {
+                  bestNext = { item, orient, index, score };
+                }
+              }
+            }
+            if (!bestNext) break;
+            row.entries.push({ item: bestNext.item, orient: bestNext.orient });
+            row.indices.push(bestNext.index);
+            row.usedWidth += bestNext.orient.packWidth;
+            row.rowLength = Math.max(row.rowLength, bestNext.orient.packLength);
+            row.area += bestNext.item.actualArea;
+            used.add(bestNext.index);
+          }
+
+          const density = row.area / Math.max(1, row.rowLength * trailer.width);
+          const uniqueTypes = new Set(row.entries.map((entry) => entry.item.rowId)).size;
+          const mixedBonus = uniqueTypes > 1 ? 1 : 0;
+          const widthLeft = trailer.width - row.usedWidth;
+          const widthBucket = Math.ceil(widthLeft / 120);
+          const rowScore = mode === "dense"
+            ? [widthBucket, -mixedBonus, -uniqueTypes, -density, widthLeft, row.rowLength, -row.entries.length]
+            : [widthBucket, -mixedBonus, -uniqueTypes, widthLeft, row.rowLength, -density, -row.entries.length];
+          if (!bestRow || compareScore(rowScore, bestRow.score) < 0) {
+            bestRow = { ...row, score: rowScore };
+          }
+        }
+      }
+      return bestRow;
+    }
+
+    function packItemsAdaptive(items, trailer, allowRotate, method) {
+      const remaining = [...items];
+      const bin = new MaxRectsBin(trailer.length, trailer.width);
+      const placed = [];
+
+      while (remaining.length > 0) {
+        let best = null;
+        for (let index = 0; index < remaining.length; index++) {
+          const item = remaining[index];
+          const node = bin.findNode(item, allowRotate, method);
+          if (!node) continue;
+          const contact = bin.contactScore(node);
+          const waste = node.scoreA + node.scoreB;
+          const score = [
+            node.scoreA,
+            node.scoreB,
+            -contact,
+            -item.packArea,
+            item.index
+          ];
+          if (!best || compareScore(score, best.score) < 0) {
+            best = { item, node, index, score, waste };
+          }
+        }
+
+        if (!best) break;
+        bin.placeNode(best.node);
+        const item = best.item;
+        placed.push({
+          id: item.id,
+          rowId: item.rowId,
+          itemIndex: item.itemIndex,
+          name: item.name,
+          color: item.color,
+          x: best.node.x,
+          y: best.node.y,
+          packLength: best.node.w,
+          packWidth: best.node.h,
+          length: best.node.actualLength,
+          width: best.node.actualWidth,
+          originalLength: item.length,
+          originalWidth: item.width,
+          rotated: best.node.rotated,
+          area: best.node.actualLength * best.node.actualWidth
+        });
+        remaining.splice(best.index, 1);
+      }
+
+      return buildPlanResult(placed, remaining, trailer, "adaptacyjna", method, bin.freeRects);
+    }
+
+    function compareScore(a, b) {
+      for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        const left = a[i] ?? 0;
+        const right = b[i] ?? 0;
+        if (left < right) return -1;
+        if (left > right) return 1;
+      }
+      return 0;
+    }
+
+    function rangesOverlap(aStart, aSize, bStart, bSize) {
+      return aStart < bStart + bSize && bStart < aStart + aSize;
+    }
+
+    function compactPlacedItems(placed, trailer) {
+      const compacted = placed.map((item) => ({ ...item }));
+      for (let pass = 0; pass < 4; pass++) {
+        compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+        for (const item of compacted) {
+          let targetX = 0;
+          for (const other of compacted) {
+            if (other === item) continue;
+            if (!rangesOverlap(item.y, item.packWidth, other.y, other.packWidth)) continue;
+            if (other.x + other.packLength <= item.x) {
+              targetX = Math.max(targetX, other.x + other.packLength);
+            }
+          }
+          item.x = Math.min(item.x, Math.max(0, Math.min(targetX, trailer.length - item.packLength)));
+        }
+
+        compacted.sort((a, b) => a.y - b.y || a.x - b.x);
+        for (const item of compacted) {
+          let targetY = 0;
+          for (const other of compacted) {
+            if (other === item) continue;
+            if (!rangesOverlap(item.x, item.packLength, other.x, other.packLength)) continue;
+            if (other.y + other.packWidth <= item.y) {
+              targetY = Math.max(targetY, other.y + other.packWidth);
+            }
+          }
+          item.y = Math.min(item.y, Math.max(0, Math.min(targetY, trailer.width - item.packWidth)));
+        }
+      }
+      return compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
+
+    function buildPlanResult(placed, unplaced, trailer, strategyLabel, method, freeRects) {
+      const normalizedPlaced = compactPlacedItems(placed, trailer);
+      const placedArea = normalizedPlaced.reduce((sum, item) => sum + item.area, 0);
+      const usedLength = normalizedPlaced.reduce((max, item) => Math.max(max, item.x + item.length), 0);
+      const usedWidth = normalizedPlaced.reduce((max, item) => Math.max(max, item.y + item.width), 0);
+      const packUsedLength = normalizedPlaced.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+      const packUsedWidth = normalizedPlaced.reduce((max, item) => Math.max(max, item.y + item.packWidth), 0);
+      const trailerArea = trailer.length * trailer.width;
+      const rawFreeArea = freeRects.reduce((sum, rect) => sum + rect.w * rect.h, 0);
+      const freeArea = freeRects.length > 0 ? rawFreeArea : Math.max(0, trailerArea - placedArea);
+
+      return {
+        placed: normalizedPlaced,
+        unplaced,
+        placedArea,
+        usedLength,
+        usedWidth,
+        packUsedLength,
+        packUsedWidth,
+        trailerArea,
+        trailerWidth: trailer.width,
+        fill: trailerArea > 0 ? placedArea / trailerArea : 0,
+        freeArea,
+        strategyLabel,
+        method
+      };
+    }
+
+    function overlapAmount(aStart, aSize, bStart, bSize) {
+      return Math.max(0, Math.min(aStart + aSize, bStart + bSize) - Math.max(aStart, bStart));
+    }
+
+    function layoutBlockinessPenalty(placed) {
+      if (placed.length < 2) return 0;
+      let sameTypeContact = 0;
+      let differentTypeContact = 0;
+      const tolerance = 4;
+
+      for (let i = 0; i < placed.length; i++) {
+        const a = placed[i];
+        for (let j = i + 1; j < placed.length; j++) {
+          const b = placed[j];
+          if ((a.trailerIndex || 1) !== (b.trailerIndex || 1)) continue;
+
+          const verticalTouch =
+            Math.abs(a.x + a.packLength - b.x) <= tolerance ||
+            Math.abs(b.x + b.packLength - a.x) <= tolerance;
+          if (verticalTouch) {
+            const contact = overlapAmount(a.y, a.packWidth, b.y, b.packWidth);
+            if (contact > 0) {
+              if (a.rowId === b.rowId) sameTypeContact += contact;
+              else differentTypeContact += contact * 0.22;
+            }
+          }
+
+          const horizontalTouch =
+            Math.abs(a.y + a.packWidth - b.y) <= tolerance ||
+            Math.abs(b.y + b.packWidth - a.y) <= tolerance;
+          if (horizontalTouch) {
+            const contact = overlapAmount(a.x, a.packLength, b.x, b.packLength);
+            if (contact > 0) {
+              if (a.rowId === b.rowId) sameTypeContact += contact * 1.15;
+              else differentTypeContact += contact * 0.18;
+            }
+          }
+        }
+      }
+
+      const sameTypeRatio = sameTypeContact / Math.max(1, sameTypeContact + differentTypeContact);
+      return sameTypeContact * (0.6 + sameTypeRatio);
+    }
+
+    function scorePlan(plan, compactLength) {
+      const placedCount = plan.placed.length;
+      const areaScore = plan.placedArea;
+      const lengthPenalty = compactLength ? plan.packUsedLength * 1000 + plan.packUsedWidth : 0;
+      const activeArea = Math.max(0, plan.packUsedLength * (plan.trailerWidth || 0));
+      const internalWaste = Math.max(0, activeArea - plan.placedArea);
+      const blockPenalty = layoutBlockinessPenalty(plan.placed);
+      return placedCount * 1e14 + areaScore * 100 - lengthPenalty - internalWaste * 0.05 - plan.freeArea * 0.001 - blockPenalty * 2400;
+    }
+
+    function isMixedStrategy(plan) {
+      return Boolean(
+        plan?.strategyLabel?.startsWith("mieszana") ||
+        plan?.strategyLabel?.startsWith("rz") ||
+        plan?.strategyLabel?.startsWith("kombinacje") ||
+        plan?.strategyLabel === "adaptacyjna"
+      );
+    }
+
+    function isBeamStrategy(plan) {
+      return Boolean(plan?.strategyLabel?.startsWith("kombinacje"));
+    }
+
+    function buildBeamProfiles(layoutSeed, quality, deadline) {
+      const config = searchQualityConfig(quality);
+      const profiles = BEAM_PACK_PROFILES.map((profile, index) => ({
+        ...profile,
+        seed: mixSeed(layoutSeed, index + 1, 1009),
+        exhaustive: quality === "deep",
+        deadline
+      }));
+      const rng = createRng(mixSeed(layoutSeed, config.randomRuns, 7001));
+
+      for (let i = 0; i < config.randomRuns; i++) {
+        const densityWeight = 5600 + rng() * 11200;
+        const lengthWeight = 48 + rng() * 115;
+        const wasteWeight = 0.12 + rng() * 0.42;
+        const mixWeight = 320 + rng() * 1500;
+        const repeatWeight = 550 + rng() * 2600;
+        profiles.push({
+          key: `random-${i + 1}`,
+          label: "wariant zaawansowany",
+          beamWidth: Math.round((150 + rng() * 310) * config.beamScale),
+          branchLimit: Math.round((28 + rng() * 48) * config.branchScale),
+          densityWeight,
+          lengthWeight,
+          wasteWeight,
+          mixWeight,
+          repeatWeight,
+          optionJitter: 3000 + rng() * 11000,
+          patternJitter: 2600 + rng() * 16000,
+          stateJitter: 1800 + rng() * 10000,
+          patternLimit: Math.round(900 + rng() * 1800),
+          seed: mixSeed(layoutSeed, i + 1, 99023),
+          exhaustive: quality === "deep",
+          deadline
+        });
+      }
+
+      return profiles;
+    }
+
+    function planSignature(plan) {
+      return plan.placed
+        .map((item) => [
+          item.rowId,
+          Math.round(item.x / 20),
+          Math.round(item.y / 20),
+          Math.round(item.packLength / 20),
+          Math.round(item.packWidth / 20),
+          item.rotated ? 1 : 0,
+          item.trailerIndex || 1
+        ].join(":"))
+        .join("|");
+    }
+
+    function addCandidatePlan(map, plan, score) {
+      const signature = planSignature(plan);
+      const current = map.get(signature);
+      if (!current || isBetterPlan(plan, score, current.plan, current.score)) {
+        map.set(signature, { plan, score });
+      }
+    }
+
+    function sortedCandidatePlans(map) {
+      return [...map.values()].sort((a, b) => {
+        if (isBetterPlan(a.plan, a.score, b.plan, b.score)) return -1;
+        if (isBetterPlan(b.plan, b.score, a.plan, a.score)) return 1;
+        return a.plan.strategyLabel.localeCompare(b.plan.strategyLabel);
+      });
+    }
+
+    function choosePlanVariant(candidates, layoutVariant) {
+      if (candidates.length === 0) return null;
+      const best = candidates[0].plan;
+      if (layoutVariant <= 0) return candidates[0];
+
+      const bestDensity = best.placedArea / Math.max(1, best.packUsedLength * (best.trailerWidth || 1));
+      const acceptable = candidates.filter(({ plan }) => {
+        const density = plan.placedArea / Math.max(1, plan.packUsedLength * (plan.trailerWidth || 1));
+        return plan.placed.length === best.placed.length &&
+          plan.unplaced.length === best.unplaced.length &&
+          plan.packUsedLength <= Math.max(best.packUsedLength + 1800, best.packUsedLength * 1.18) &&
+          density >= bestDensity - 0.08;
+      });
+
+      const pool = acceptable.length > 1 ? acceptable : candidates;
+      return pool[layoutVariant % pool.length] || candidates[0];
+    }
+
+    function isBetterPlan(plan, score, bestPlan, bestScore) {
+      if (!bestPlan) return true;
+      const sameLoad = plan.placed.length === bestPlan.placed.length && plan.unplaced.length === bestPlan.unplaced.length;
+      if (sameLoad) {
+        const planActiveDensity = plan.placedArea / Math.max(1, plan.packUsedLength * (plan.trailerWidth || 1));
+        const bestActiveDensity = bestPlan.placedArea / Math.max(1, bestPlan.packUsedLength * (bestPlan.trailerWidth || 1));
+        if (
+          isBeamStrategy(plan) &&
+          plan.packUsedLength <= bestPlan.packUsedLength * 1.08 &&
+          planActiveDensity >= bestActiveDensity - 0.01
+        ) {
+          return true;
+        }
+        if (
+          isMixedStrategy(plan) &&
+          plan.packUsedLength <= bestPlan.packUsedLength * 1.04 &&
+          planActiveDensity > bestActiveDensity + 0.015
+        ) {
+          return true;
+        }
+      }
+      const epsilon = 1e-6;
+      if (score > bestScore + epsilon) return true;
+      if (Math.abs(score - bestScore) > epsilon) return false;
+      if (plan.packUsedLength < bestPlan.packUsedLength) return true;
+      if (plan.packUsedLength > bestPlan.packUsedLength) return false;
+      return isMixedStrategy(plan) && !isMixedStrategy(bestPlan);
+    }
+
+    async function findBestPlan(items, trailer, allowRotate, compactLength, options = {}) {
+      if (items.length === 0 || trailer.length <= 0 || trailer.width <= 0) {
+        return buildPlanResult([], items, trailer, "Brak", "none", []);
+      }
+
+      const quality = options.searchQuality || state.searchQuality;
+      const deadline = options.deadline || Infinity;
+      const layoutVariant = Math.max(0, Math.floor(options.layoutVariant || 0));
+      const layoutSeed = mixSeed(options.inputSeed || 1, layoutVariant, items.length, trailer.length, trailer.width);
+      const candidates = new Map();
+
+      const collectPlan = (plan) => {
+        const score = scorePlan(plan, compactLength);
+        addCandidatePlan(candidates, plan, score);
+      };
+
+      const identicalGridPlan = packIdenticalItemsGrid(items, trailer, allowRotate);
+      if (identicalGridPlan) {
+        collectPlan(identicalGridPlan);
+        await yieldToBrowser();
+      }
+
+      for (const strategy of ORDER_STRATEGIES) {
+        for (const method of PACK_METHODS) {
+          if (nowMs() > deadline) break;
+          collectPlan(packItems(items, trailer, allowRotate, strategy, method));
+          if (candidates.size % 4 === 0) await yieldToBrowser();
+        }
+      }
+      for (const mode of ["wide", "dense"]) {
+        if (nowMs() > deadline) break;
+        collectPlan(packItemsRows(items, trailer, allowRotate, mode));
+        await yieldToBrowser();
+      }
+      for (const profile of buildBeamProfiles(layoutSeed, quality, deadline)) {
+        if (nowMs() > deadline) break;
+        collectPlan(packItemsByRowBeam(items, trailer, allowRotate, profile));
+        if (candidates.size % 2 === 0) await yieldToBrowser();
+      }
+      for (const method of PACK_METHODS) {
+        for (const mode of ["area", "width"]) {
+          if (nowMs() > deadline) break;
+          collectPlan(packItemsRoundRobin(items, trailer, allowRotate, method, mode));
+          if (candidates.size % 4 === 0) await yieldToBrowser();
+        }
+      }
+      for (const method of PACK_METHODS) {
+        if (nowMs() > deadline) break;
+        collectPlan(packItemsAdaptive(items, trailer, allowRotate, method));
+        await yieldToBrowser();
+      }
+
+      const sorted = sortedCandidatePlans(candidates);
+      const selected = choosePlanVariant(sorted, layoutVariant);
+      if (!selected) return buildPlanResult([], items, trailer, "Brak", "none", []);
+      selected.plan.candidateCount = sorted.length;
+      selected.plan.variantCount = packVariantCount(quality);
+      return selected.plan;
+    }
+
+    async function findMultiTrailerPlan(items, trailer, allowRotate, compactLength, options = {}) {
+      const trailers = [];
+      const placed = [];
+      let unplaced = [...items];
+      let placedArea = 0;
+      let totalUsedLength = 0;
+      let maxUsedLength = 0;
+      let maxUsedWidth = 0;
+      const strategyNames = new Set();
+      const methodNames = new Set();
+      let maxCandidateCount = 0;
+      let maxVariantCount = 0;
+
+      while (unplaced.length > 0) {
+        const trailerPlan = await findBestPlan(unplaced, trailer, allowRotate, compactLength, {
+          ...options,
+          layoutVariant: Math.max(0, Math.floor(options.layoutVariant || 0)) + trailers.length * 7,
+          inputSeed: mixSeed(options.inputSeed || 1, trailers.length + 1)
+        });
+        if (!trailerPlan || trailerPlan.placed.length === 0) {
+          break;
+        }
+
+        const trailerIndex = trailers.length + 1;
+        const trailerPlaced = trailerPlan.placed.map((item) => ({
+          ...item,
+          trailerIndex
+        }));
+
+        trailers.push({
+          index: trailerIndex,
+          placed: trailerPlaced,
+          usedLength: trailerPlan.usedLength,
+          usedWidth: trailerPlan.usedWidth,
+          packUsedLength: trailerPlan.packUsedLength,
+          packUsedWidth: trailerPlan.packUsedWidth,
+          fill: trailerPlan.fill,
+          placedArea: trailerPlan.placedArea,
+          strategyLabel: trailerPlan.strategyLabel,
+          method: trailerPlan.method
+        });
+
+        placed.push(...trailerPlaced);
+        placedArea += trailerPlan.placedArea;
+        totalUsedLength += trailerPlan.usedLength;
+        maxUsedLength = Math.max(maxUsedLength, trailerPlan.usedLength);
+        maxUsedWidth = Math.max(maxUsedWidth, trailerPlan.usedWidth);
+        strategyNames.add(trailerPlan.strategyLabel);
+        methodNames.add(trailerPlan.method);
+        maxCandidateCount = Math.max(maxCandidateCount, trailerPlan.candidateCount || 0);
+        maxVariantCount = Math.max(maxVariantCount, trailerPlan.variantCount || 0);
+        unplaced = trailerPlan.unplaced;
+      }
+
+      const trailerArea = trailer.length * trailer.width;
+      const trailerCount = trailers.length;
+      return {
+        placed,
+        unplaced,
+        trailers,
+        trailerCount,
+        placedArea,
+        usedLength: totalUsedLength,
+        maxUsedLength,
+        usedWidth: maxUsedWidth,
+        packUsedLength: Math.max(0, ...trailers.map((item) => item.packUsedLength)),
+        packUsedWidth: Math.max(0, ...trailers.map((item) => item.packUsedWidth)),
+        trailerArea,
+        fill: trailerCount > 0 && trailerArea > 0 ? placedArea / (trailerArea * trailerCount) : 0,
+        freeArea: Math.max(0, trailerArea * trailerCount - placedArea),
+        strategyLabel: strategyNames.size > 1 ? "mieszana" : ([...strategyNames][0] || "Brak"),
+        method: methodNames.size > 1 ? "mieszana" : ([...methodNames][0] || "none"),
+        candidateCount: maxCandidateCount,
+        variantCount: maxVariantCount || packVariantCount(options.searchQuality || state.searchQuality),
+        layoutVariant: Math.max(0, Math.floor(options.layoutVariant || 0)),
+        searchQuality: options.searchQuality || state.searchQuality
+      };
+    }
+
+    function buildIssues(plan, items, trailer) {
+      const issues = [];
+      if (items.length === 0) {
+        issues.push({ kind: "info", text: "Dodaj co najmniej jedną paletę z ilością większą od zera." });
+      }
+      if (plan.unplaced.length > 0) {
+        const grouped = groupByName(plan.unplaced);
+        for (const item of grouped) {
+          issues.push({ kind: "bad", text: `Nie zmieszczono: ${item.name} - ${item.count} szt.` });
+        }
+      }
+      if (plan.trailerCount > 1) {
+        issues.push({ kind: "info", text: `Ładunek rozłożono na ${formatTrailerCount(plan.trailerCount)}.` });
+      }
+      for (const row of state.rows) {
+        const length = clampNumber(row.length, 1, 1) + state.gap;
+        const width = clampNumber(row.width, 1, 1) + state.gap;
+        const normalFits = length <= trailer.length && width <= trailer.width;
+        const rotatedFits = state.allowRotate && width <= trailer.length && length <= trailer.width;
+        if (row.quantity > 0 && !normalFits && !rotatedFits) {
+          issues.push({ kind: "bad", text: `${row.name || "Paleta"} jest większa niż dostępny footprint naczepy.` });
+        }
+      }
+      if (issues.length === 0) {
+        if (plan.method === "WASM CP-SAT") {
+          const statusText = plan.status === "OPTIMAL" ? "optymalność potwierdzona" : "najlepszy znaleziony wynik w limicie czasu";
+          issues.push({ kind: "info", text: `Plan policzony silnikiem OR-Tools CP-SAT WebAssembly: ${statusText}. Model: ${formatInt(plan.variantCount || 0)} zmiennych, ${formatInt(plan.candidateCount || 0)} ograniczeń.` });
+        } else {
+          const testedLayouts = Math.max(plan.candidateCount || 0, plan.variantCount || 0, packVariantCount(plan.searchQuality));
+          issues.push({ kind: "info", text: `Plan wybrany z ${formatInt(testedLayouts)} kandydatów heurystyki, w tym z mieszania rozmiarów, MaxRects i dosuwania skyline.` });
+        }
+      }
+      return issues;
+    }
+
+    function groupByName(items) {
+      const map = new Map();
+      for (const item of items) {
+        const key = `${item.rowId}:${item.name}`;
+        const entry = map.get(key) || { name: item.name, count: 0 };
+        entry.count++;
+        map.set(key, entry);
+      }
+      return [...map.values()];
+    }
+
+    function summarizeByType(plan) {
+      const demand = new Map();
+      for (const row of state.rows) {
+        const name = row.name.trim() || "Paleta";
+        demand.set(row.id, {
+          rowId: row.id,
+          name,
+          color: row.color,
+          requested: Math.floor(clampNumber(row.quantity, 0, 0)),
+          placed: 0
+        });
+      }
+      for (const placed of plan.placed) {
+        const entry = demand.get(placed.rowId);
+        if (entry) entry.placed++;
+      }
+      return [...demand.values()].filter((item) => item.requested > 0);
+    }
+
+    async function calculateAndRender(options = {}) {
+      const token = ++calculationToken;
+      const qualityForStatus = options.auto ? "szybkie" : searchQualityConfig(state.searchQuality).label.toLowerCase();
+      setCalculating(true, `Liczenie układu (${qualityForStatus})...`);
+      await yieldToBrowser();
+
+      try {
+        const trailer = {
+          length: clampNumber(state.trailerLength, 1, 13620),
+          width: clampNumber(state.trailerWidth, 1, 2480)
+        };
+        const items = expandItems(state.rows, state.gap);
+        const quality = options.auto ? "fast" : state.searchQuality;
+        const config = searchQualityConfig(quality);
+        const startedAt = nowMs();
+        const deadline = startedAt + config.budgetMs;
+        const seed = inputSeed(items, trailer, state.gap, state.allowRotate);
+        let plan;
+        const solverPayload = {
+          rows: state.rows,
+          trailer,
+          gap: state.gap,
+          allowRotate: state.allowRotate,
+          compactLength: state.compactLength,
+          searchQuality: quality,
+          layoutVariant: state.layoutVariant,
+          maxTimeSeconds: Math.max(1, Math.floor(config.budgetMs / 1000))
+        };
+        try {
+          plan = quality === "deep" && !options.auto
+            ? await solveWithCpSatWorker(solverPayload, token)
+            : await solveWithWorker(solverPayload, token);
+        } catch (error) {
+          console.warn("Primary solver unavailable, using fallback.", error);
+          plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
+            searchQuality: quality,
+            layoutVariant: state.layoutVariant,
+            inputSeed: seed,
+            deadline
+          });
+        }
+        if (token !== calculationToken) return currentPlan;
+        currentPlan = {
+          ...plan,
+          trailer,
+          totalItems: items.length,
+          gap: state.gap,
+          allowRotate: state.allowRotate,
+          searchElapsedMs: plan.searchElapsedMs || (nowMs() - startedAt),
+          autoSearch: Boolean(options.auto)
+        };
+
+        updateMetrics(currentPlan);
+        renderLegend(currentPlan);
+        renderIssues(buildIssues(currentPlan, items, trailer));
+        drawDeck(currentPlan);
+        saveState();
+        return currentPlan;
+      } finally {
+        if (token === calculationToken) setCalculating(false);
+      }
+    }
+
+    function updateMetrics(plan) {
+      const missing = plan.unplaced.length;
+      el.placedMetric.textContent = `${formatInt(plan.placed.length)} / ${formatInt(plan.totalItems)}`;
+      el.fillMetric.textContent = formatPercent(plan.fill);
+      el.ldmMetric.textContent = formatDecimal(plan.usedLength / 1000, 2);
+      el.trailersMetric.textContent = formatInt(plan.trailerCount);
+      el.missingMetric.textContent = formatInt(missing);
+
+      el.placedMetric.className = `metric-value ${missing === 0 ? "good" : "warn"}`;
+      el.fillMetric.className = "metric-value";
+      el.ldmMetric.className = "metric-value";
+      el.trailersMetric.className = "metric-value";
+      el.missingMetric.className = `metric-value ${missing === 0 ? "good" : "bad"}`;
+
+      const trailerLabel = `${formatInt(plan.trailer.length)} x ${formatInt(plan.trailer.width)} mm`;
+      const trailerText = formatTrailerCount(plan.trailerCount);
+      const variantText = plan.layoutVariant > 0 ? `, wariant: ${formatInt(plan.layoutVariant + 1)}` : "";
+      const qualityText = plan.autoSearch ? "szybkie" : searchQualityConfig(plan.searchQuality).label.toLowerCase();
+      el.planSubtitle.textContent = `${trailerText}, ${trailerLabel}, strategia: ${plan.strategyLabel}, metoda: ${plan.method}${variantText}, liczenie: ${qualityText}.`;
+      updateStatus(missing === 0 ? "good" : "warn", missing === 0 ? "Wszystko ułożone" : "Są nieułożone palety");
+    }
+
+    function renderLegend(plan) {
+      const summary = summarizeByType(plan);
+      if (summary.length === 0) {
+        el.legendList.innerHTML = `<li class="empty-state">Brak palet w planie.</li>`;
+        return;
+      }
+      el.legendList.innerHTML = summary.map((item) => `
+        <li class="legend-item">
+          <span class="swatch" style="background:${escapeHtml(item.color)}"></span>
+          <span class="legend-name">${escapeHtml(item.name)}</span>
+          <span class="legend-count">${formatInt(item.placed)} / ${formatInt(item.requested)}</span>
+        </li>
+      `).join("");
+    }
+
+    function renderIssues(issues) {
+      el.issueList.innerHTML = issues
+        .map((issue) => `<li class="${issue.kind === "info" ? "info" : ""}">${escapeHtml(issue.text)}</li>`)
+        .join("");
+    }
+
+    function setupCanvasSize() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = el.canvas.getBoundingClientRect();
+      const width = Math.max(320, Math.round(rect.width));
+      const height = Math.max(240, Math.round(rect.height));
+      el.canvas.width = Math.round(width * dpr);
+      el.canvas.height = Math.round(height * dpr);
+      const ctx = el.canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, width, height };
+    }
+
+    function setCanvasHeightForPlan(plan) {
+      const count = Math.max(1, plan.trailers?.length || 1);
+      const shellWidth = Math.max(320, el.canvasShell.clientWidth || el.canvas.clientWidth || 900);
+      const gap = 34;
+      const sidePad = shellWidth < 760 ? 32 : 64;
+      const maxTrailerWidth = shellWidth >= 1180 ? 260 : shellWidth >= 760 ? 230 : Math.min(190, shellWidth - sidePad);
+      const columnsByWidth = Math.max(1, Math.floor((shellWidth - sidePad + gap) / (maxTrailerWidth + gap)));
+      const columns = Math.max(1, Math.min(count, columnsByWidth, shellWidth >= 1180 ? 3 : shellWidth >= 760 ? 2 : 1));
+      const trailerDrawW = Math.min(maxTrailerWidth, (shellWidth - sidePad - gap * (columns - 1)) / columns);
+      const trailerDrawH = trailerDrawW * (plan.trailer.length / plan.trailer.width);
+      const rows = Math.ceil(count / columns);
+      const rowGap = 34;
+      const verticalPad = 72;
+      const height = Math.ceil(verticalPad + rows * trailerDrawH + (rows - 1) * rowGap);
+      el.canvas.style.height = `${Math.max(shellWidth < 760 ? 520 : 620, height)}px`;
+    }
+
+    function drawDeck(plan) {
+      setCanvasHeightForPlan(plan);
+      const { ctx, width, height } = setupCanvasSize();
+      ctx.clearRect(0, 0, width, height);
+
+      const trailer = plan.trailer;
+      const visualTrailers = plan.trailers?.length ? plan.trailers : [{ index: 1, placed: [] }];
+      const gap = 34;
+      const padX = width < 760 ? 16 : 32;
+      const padY = 44;
+      const maxTrailerWidth = width >= 1180 ? 260 : width >= 760 ? 230 : Math.min(190, width - padX * 2);
+      const columnsByWidth = Math.max(1, Math.floor((width - padX * 2 + gap) / (maxTrailerWidth + gap)));
+      const columns = Math.max(1, Math.min(visualTrailers.length, columnsByWidth, width >= 1180 ? 3 : width >= 760 ? 2 : 1));
+      const deckW = Math.min(maxTrailerWidth, (width - padX * 2 - gap * (columns - 1)) / columns);
+      const scale = deckW / trailer.width;
+      const deckH = trailer.length * scale;
+      const rowGap = 34;
+      const totalGridW = columns * deckW + (columns - 1) * gap;
+      const startX = (width - totalGridW) / 2;
+      const layouts = [];
+
+      ctx.save();
+      for (const trailerPlan of visualTrailers) {
+        const position = trailerPlan.index - 1;
+        const col = position % columns;
+        const row = Math.floor(position / columns);
+        const ox = startX + col * (deckW + gap);
+        const oy = padY + row * (deckH + rowGap);
+        const layout = { index: trailerPlan.index, ox, oy, scale, deckW, deckH, trailer, width, height };
+        layouts.push(layout);
+
+        ctx.fillStyle = "#f8fafc";
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(ox, oy, deckW, deckH);
+        ctx.strokeRect(ox, oy, deckW, deckH);
+        drawGrid(ctx, layout);
+        drawLabels(ctx, layout, visualTrailers.length);
+
+        for (const pallet of plan.placed.filter((item) => item.trailerIndex === trailerPlan.index)) {
+          drawPallet(ctx, pallet, layout, pallet.id === hoveredId);
+        }
+      }
+      ctx.restore();
+      drawState = { layouts, trailer, width, height };
+    }
+
+    function drawGrid(ctx, layout) {
+      const { ox, oy, deckW, deckH, trailer, scale } = layout;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(ox, oy, deckW, deckH);
+      ctx.clip();
+      ctx.strokeStyle = "#dbe3ed";
+      ctx.lineWidth = 1;
+      const step = 1000;
+      for (let trailerWidth = step; trailerWidth < trailer.width; trailerWidth += step) {
+        const px = ox + trailerWidth * scale;
+        ctx.beginPath();
+        ctx.moveTo(px, oy);
+        ctx.lineTo(px, oy + deckH);
+        ctx.stroke();
+      }
+      for (let trailerLength = step; trailerLength < trailer.length; trailerLength += step) {
+        const py = oy + trailerLength * scale;
+        ctx.beginPath();
+        ctx.moveTo(ox, py);
+        ctx.lineTo(ox + deckW, py);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawLabels(ctx, layout, totalTrailers) {
+      const { ox, oy, deckW, deckH, trailer } = layout;
+      ctx.save();
+      ctx.fillStyle = "#cbd5e1";
+      ctx.fillRect(ox + deckW * 0.2, oy + deckH - 4, deckW * 0.6, 4);
+      ctx.fillStyle = "#334155";
+      ctx.font = "700 12px Segoe UI, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(totalTrailers > 1 ? `Naczepa ${layout.index}` : "Naczepa", ox + deckW / 2, oy - 16);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "11px Segoe UI, Arial, sans-serif";
+      ctx.fillText("ciągnik u góry", ox + deckW / 2, oy - 3);
+      ctx.restore();
+    }
+
+    function readableTextColor(hex) {
+      const clean = hex.replace("#", "");
+      const r = parseInt(clean.slice(0, 2), 16);
+      const g = parseInt(clean.slice(2, 4), 16);
+      const b = parseInt(clean.slice(4, 6), 16);
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return luminance > 0.58 ? "#172033" : "#ffffff";
+    }
+
+    function drawPallet(ctx, pallet, ds, isHovered) {
+      const x = ds.ox + pallet.y * ds.scale;
+      const y = ds.oy + pallet.x * ds.scale;
+      const w = pallet.width * ds.scale;
+      const h = pallet.length * ds.scale;
+
+      ctx.save();
+      ctx.fillStyle = pallet.color;
+      ctx.strokeStyle = isHovered ? "#111827" : "rgba(255,255,255,0.85)";
+      ctx.lineWidth = isHovered ? 3 : 1.25;
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+
+      if (w >= 28 && h >= 22) {
+        const shortName = pallet.name.length > 14 ? `${pallet.name.slice(0, 13)}…` : pallet.name;
+        const maxFont = Math.min(12, Math.max(8, Math.min(w, h) * 0.32));
+        ctx.fillStyle = readableTextColor(pallet.color);
+        ctx.font = `700 ${maxFont}px Segoe UI, Arial, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(shortName, x + w / 2, y + h / 2);
+      }
+      ctx.restore();
+    }
+
+    function hitTestPallet(clientX, clientY) {
+      if (!currentPlan || !drawState) return null;
+      const rect = el.canvas.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+
+      for (let i = currentPlan.placed.length - 1; i >= 0; i--) {
+        const pallet = currentPlan.placed[i];
+        const layout = drawState.layouts.find((item) => item.index === pallet.trailerIndex);
+        if (!layout) continue;
+        const lengthPos = (py - layout.oy) / layout.scale;
+        const widthPos = (px - layout.ox) / layout.scale;
+        if (
+          lengthPos >= pallet.x &&
+          lengthPos <= pallet.x + pallet.length &&
+          widthPos >= pallet.y &&
+          widthPos <= pallet.y + pallet.width
+        ) {
+          return { pallet, px, py };
+        }
+      }
+      return null;
+    }
+
+    function showTooltip(hit) {
+      if (!hit) {
+        hoveredId = null;
+        el.tooltip.style.display = "none";
+        if (currentPlan) drawDeck(currentPlan);
+        return;
+      }
+
+      hoveredId = hit.pallet.id;
+      const pallet = hit.pallet;
+      el.tooltip.innerHTML = `
+        <strong>${escapeHtml(pallet.name)} #${pallet.itemIndex}</strong>
+        Naczepa: ${formatInt(pallet.trailerIndex || 1)}<br>
+        Pozycja: ${formatInt(pallet.x)} / ${formatInt(pallet.y)} mm<br>
+        Wymiar: ${formatInt(pallet.length)} x ${formatInt(pallet.width)} mm<br>
+        Orientacja: ${pallet.rotated ? "obrócona" : "bazowa"}
+      `;
+      const shellRect = el.canvasShell.getBoundingClientRect();
+      const left = Math.min(hit.px + 14, shellRect.width - 270);
+      const top = Math.min(hit.py + 14, shellRect.height - 92);
+      el.tooltip.style.left = `${Math.max(8, left)}px`;
+      el.tooltip.style.top = `${Math.max(8, top)}px`;
+      el.tooltip.style.display = "block";
+      drawDeck(currentPlan);
+    }
+
+    async function exportCsv() {
+      if (!currentPlan) await calculateAndRender();
+      if (!currentPlan) return;
+      const header = [
+        "lp",
+        "naczepa",
+        "typ",
+        "x_mm",
+        "y_mm",
+        "dlugosc_mm",
+        "szerokosc_mm",
+        "obrot_90",
+        "kolor"
+      ];
+      const rows = currentPlan.placed
+        .slice()
+        .sort((a, b) => (a.trailerIndex || 1) - (b.trailerIndex || 1) || a.x - b.x || a.y - b.y)
+        .map((item, index) => [
+          index + 1,
+          item.trailerIndex || 1,
+          item.name,
+          Math.round(item.x),
+          Math.round(item.y),
+          Math.round(item.length),
+          Math.round(item.width),
+          item.rotated ? "tak" : "nie",
+          item.color
+        ]);
+      const csv = [header, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
+        .join("\r\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "rozklad-palet.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function bindEvents() {
+      el.trailerPreset.addEventListener("change", () => {
+        const preset = TRAILER_PRESETS.find((item) => item.key === el.trailerPreset.value);
+        state.trailerPreset = el.trailerPreset.value;
+        if (preset && preset.key !== "custom") {
+          state.trailerLength = preset.length;
+          state.trailerWidth = preset.width;
+          renderControls();
+        }
+        scheduleRecalc();
+      });
+
+      for (const input of [el.trailerLength, el.trailerWidth, el.gap, el.rotate, el.compact, el.searchQuality]) {
+        input.addEventListener("input", () => {
+          if (input === el.trailerLength || input === el.trailerWidth) {
+            state.trailerPreset = "custom";
+            el.trailerPreset.value = "custom";
+          }
+          scheduleRecalc();
+        });
+        input.addEventListener("change", scheduleRecalc);
+      }
+
+      el.loadsBody.addEventListener("input", (event) => {
+        const row = findRowByElement(event.target);
+        if (!row) return;
+        const field = event.target.dataset.field;
+        if (!field) return;
+        if (field === "quantity") {
+          row.quantity = Math.floor(clampNumber(event.target.value, 1, row.quantity));
+        }
+        scheduleRecalc();
+      });
+
+      el.loadsBody.addEventListener("click", (event) => {
+        const actionButton = event.target.closest("button[data-action]");
+        if (!actionButton) return;
+        const row = findRowByElement(actionButton);
+        if (!row) return;
+        if (actionButton.dataset.action === "delete") {
+          state.rows = state.rows.filter((item) => item.id !== row.id);
+        }
+        renderControls();
+        scheduleRecalc();
+      });
+
+      el.addLoad.addEventListener("click", () => {
+        addPalletFromForm();
+      });
+
+      el.newPalletPreset.addEventListener("change", updateCustomAddVisibility);
+      for (const input of [el.newPalletQty, el.customPalletLength, el.customPalletWidth, el.customPalletName]) {
+        input.addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            addPalletFromForm();
+          }
+        });
+      }
+
+      el.resetDemo.addEventListener("click", () => {
+        defaultState();
+        renderControls();
+        calculateAndRender({ auto: true });
+      });
+
+      el.recalc.addEventListener("click", () => {
+        readGlobalInputs();
+        resetLayoutVariant();
+        calculateAndRender();
+      });
+
+      el.alternate.addEventListener("click", () => {
+        readGlobalInputs();
+        state.layoutVariant++;
+        calculateAndRender();
+      });
+
+      el.csv.addEventListener("click", () => exportCsv());
+      el.print.addEventListener("click", () => window.print());
+
+      el.canvas.addEventListener("mousemove", (event) => showTooltip(hitTestPallet(event.clientX, event.clientY)));
+      el.canvas.addEventListener("mouseleave", () => showTooltip(null));
+
+      window.addEventListener("resize", () => {
+        if (currentPlan) drawDeck(currentPlan);
+      });
+    }
+
+    function init() {
+      renderSelectOptions();
+      loadState();
+      renderControls();
+      updateCustomAddVisibility();
+      bindEvents();
+      window.__palletApp = {
+        state,
+        getPlan: () => currentPlan,
+        recalc: calculateAndRender,
+        resetVariant: resetLayoutVariant
+      };
+      calculateAndRender({ auto: true });
+    }
+
+    init();
+  </script>
+</body>
+</html>
