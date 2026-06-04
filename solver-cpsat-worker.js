@@ -205,6 +205,309 @@ function greedyUpperBound(items, trailer, allowRotate) {
   return Math.max(1, bins.length);
 }
 
+function overlapAmount(aStart, aSize, bStart, bSize) {
+  return Math.max(0, Math.min(aStart + aSize, bStart + bSize) - Math.max(aStart, bStart));
+}
+
+function placedOrientations(source, trailer, allowRotate, gap) {
+  const originalLength = source.originalLength || source.length;
+  const originalWidth = source.originalWidth || source.width;
+  const orientations = [{
+    rotated: false,
+    packLength: originalLength + gap,
+    packWidth: originalWidth + gap,
+    length: originalLength,
+    width: originalWidth
+  }];
+  if (allowRotate && originalLength !== originalWidth) {
+    orientations.push({
+      rotated: true,
+      packLength: originalWidth + gap,
+      packWidth: originalLength + gap,
+      length: originalWidth,
+      width: originalLength
+    });
+  }
+  return orientations.filter((orient) =>
+    orient.packLength <= trailer.length && orient.packWidth <= trailer.width
+  );
+}
+
+function placedFromSource(source, orient, x, y) {
+  return {
+    ...source,
+    x,
+    y,
+    packLength: orient.packLength,
+    packWidth: orient.packWidth,
+    length: orient.length,
+    width: orient.width,
+    originalLength: source.originalLength || source.length,
+    originalWidth: source.originalWidth || source.width,
+    rotated: orient.rotated,
+    area: (source.originalLength || source.length) * (source.originalWidth || source.width)
+  };
+}
+
+function contactScore(candidate, placed, trailer) {
+  let contact = 0;
+  if (candidate.x === 0) contact += candidate.packWidth;
+  if (candidate.y === 0 || candidate.y + candidate.packWidth === trailer.width) {
+    contact += candidate.packLength;
+  }
+  for (const other of placed) {
+    if (other.x === candidate.x + candidate.packLength || other.x + other.packLength === candidate.x) {
+      contact += overlapAmount(candidate.y, candidate.packWidth, other.y, other.packWidth);
+    }
+    if (other.y === candidate.y + candidate.packWidth || other.y + other.packWidth === candidate.y) {
+      contact += overlapAmount(candidate.x, candidate.packLength, other.x, other.packLength);
+    }
+  }
+  return contact;
+}
+
+function compactPlacedItems(placed, trailer) {
+  const compacted = placed.map((item) => ({ ...item }));
+  for (let pass = 0; pass < 16; pass++) {
+    let moved = false;
+    compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+    for (const item of compacted) {
+      let targetX = 0;
+      for (const other of compacted) {
+        if (other === item) continue;
+        if (!rangesOverlap(item.y, item.packWidth, other.y, other.packWidth)) continue;
+        if (other.x + other.packLength <= item.x) {
+          targetX = Math.max(targetX, other.x + other.packLength);
+        }
+      }
+      targetX = Math.max(0, Math.min(targetX, trailer.length - item.packLength));
+      if (targetX < item.x) {
+        item.x = targetX;
+        moved = true;
+      }
+    }
+
+    compacted.sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const item of compacted) {
+      let targetY = 0;
+      for (const other of compacted) {
+        if (other === item) continue;
+        if (!rangesOverlap(item.x, item.packLength, other.x, other.packLength)) continue;
+        if (other.y + other.packWidth <= item.y) {
+          targetY = Math.max(targetY, other.y + other.packWidth);
+        }
+      }
+      targetY = Math.max(0, Math.min(targetY, trailer.width - item.packWidth));
+      if (targetY < item.y) {
+        item.y = targetY;
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return compacted.sort((a, b) => a.x - b.x || a.y - b.y);
+}
+
+function layoutPocketPenalty(placed, trailer) {
+  if (placed.length === 0) return 0;
+  const packUsedLength = placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+  const packArea = placed.reduce((sum, item) => sum + item.packLength * item.packWidth, 0);
+  const activeWaste = Math.max(0, packUsedLength * trailer.width - packArea);
+  let staggerWaste = 0;
+  for (const item of placed) {
+    const rightEdge = item.x + item.packLength;
+    for (const other of placed) {
+      if (other === item) continue;
+      if (other.x <= rightEdge) continue;
+      const overlap = overlapAmount(item.y, item.packWidth, other.y, other.packWidth);
+      if (overlap > 0) {
+        staggerWaste += (other.x - rightEdge) * overlap;
+        break;
+      }
+    }
+  }
+  return activeWaste + staggerWaste * 0.45;
+}
+
+function layoutContact(placed, trailer) {
+  let contact = 0;
+  for (const item of placed) {
+    if (item.x === 0) contact += item.packWidth;
+    if (item.y === 0 || item.y + item.packWidth === trailer.width) contact += item.packLength;
+  }
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      const a = placed[i];
+      const b = placed[j];
+      if (a.x + a.packLength === b.x || b.x + b.packLength === a.x) {
+        contact += overlapAmount(a.y, a.packWidth, b.y, b.packWidth);
+      }
+      if (a.y + a.packWidth === b.y || b.y + b.packWidth === a.y) {
+        contact += overlapAmount(a.x, a.packLength, b.x, b.packLength);
+      }
+    }
+  }
+  return contact;
+}
+
+function layoutScoreTuple(placed, trailer) {
+  if (placed.length === 0) return [0, 0, 0, 0, 0, 0, 0];
+  const packUsedLength = placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+  const packUsedWidth = placed.reduce((max, item) => Math.max(max, item.y + item.packWidth), 0);
+  const sumX = placed.reduce((sum, item) => sum + item.x, 0);
+  const sumY = placed.reduce((sum, item) => sum + item.y, 0);
+  const pocketPenalty = layoutPocketPenalty(placed, trailer);
+  const contact = layoutContact(placed, trailer);
+  return [packUsedLength, pocketPenalty, packUsedWidth, sumX, sumY, -contact, placed.length];
+}
+
+function skylineRepack(sources, trailer, allowRotate, gap, label) {
+  const placed = [];
+  for (const source of sources) {
+    let best = null;
+    for (const orient of placedOrientations(source, trailer, allowRotate, gap)) {
+      const yCandidates = [0, Math.max(0, trailer.width - orient.packWidth)];
+      for (const other of placed) {
+        if (other.y <= trailer.width - orient.packWidth) yCandidates.push(other.y);
+        const afterY = other.y + other.packWidth;
+        if (afterY <= trailer.width - orient.packWidth) yCandidates.push(afterY);
+      }
+      const uniqueY = [...new Set(yCandidates.map((value) => Math.round(value)))].sort((a, b) => a - b);
+      for (const y of uniqueY) {
+        if (y < 0 || y + orient.packWidth > trailer.width) continue;
+        let x = 0;
+        for (const other of placed) {
+          if (!rangesOverlap(y, orient.packWidth, other.y, other.packWidth)) continue;
+          x = Math.max(x, other.x + other.packLength);
+        }
+        if (x + orient.packLength > trailer.length) continue;
+        const candidate = placedFromSource(source, orient, x, y);
+        const score = [
+          x + orient.packLength,
+          layoutPocketPenalty([...placed, candidate], trailer),
+          x,
+          y,
+          -contactScore(candidate, placed, trailer),
+          -orient.packLength * orient.packWidth
+        ];
+        if (!best || compareTuple(score, best.score) < 0) best = { candidate, score };
+      }
+    }
+    if (!best) return null;
+    placed.push(best.candidate);
+  }
+  return {
+    label,
+    placed: compactPlacedItems(placed, trailer)
+  };
+}
+
+function maxRectsRepack(sources, trailer, allowRotate, gap, label) {
+  const bin = new MaxRectsBin(trailer.length, trailer.width);
+  const placed = [];
+  for (const source of sources) {
+    const item = {
+      ...source,
+      length: source.originalLength || source.length,
+      width: source.originalWidth || source.width,
+      packLength: (source.originalLength || source.length) + gap,
+      packWidth: (source.originalWidth || source.width) + gap
+    };
+    const node = bin.insert(item, allowRotate);
+    if (!node) return null;
+    placed.push(placedFromSource(source, {
+      rotated: node.orient.rotated,
+      packLength: node.orient.packLength,
+      packWidth: node.orient.packWidth,
+      length: node.orient.actualLength,
+      width: node.orient.actualWidth
+    }, node.x, node.y));
+  }
+  return {
+    label,
+    placed: compactPlacedItems(placed, trailer)
+  };
+}
+
+function roundRobinOrder(sources) {
+  const groups = new Map();
+  for (const source of sources) {
+    const key = source.rowId ?? source.name;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(source);
+  }
+  const queues = [...groups.values()]
+    .map((group) => group.slice().sort((a, b) => b.packLength * b.packWidth - a.packLength * a.packWidth || a.itemIndex - b.itemIndex))
+    .sort((a, b) => (b[0].packLength * b[0].packWidth) - (a[0].packLength * a[0].packWidth));
+  const ordered = [];
+  while (queues.some((queue) => queue.length > 0)) {
+    for (const queue of queues) {
+      const next = queue.shift();
+      if (next) ordered.push(next);
+    }
+  }
+  return ordered;
+}
+
+function repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap) {
+  if (trailerPlaced.length < 2) {
+    return {
+      label: "CP-SAT + kompresja",
+      placed: compactPlacedItems(trailerPlaced, trailer)
+    };
+  }
+  const base = trailerPlaced.map((item) => ({ ...item }));
+  const orders = [
+    { label: "CP-SAT + dosuniecie", items: base.slice().sort((a, b) => a.x - b.x || a.y - b.y) },
+    { label: "CP-SAT + pole", items: base.slice().sort((a, b) => b.packLength * b.packWidth - a.packLength * a.packWidth || b.packLength - a.packLength || b.packWidth - a.packWidth) },
+    { label: "CP-SAT + dlugosc", items: base.slice().sort((a, b) => b.packLength - a.packLength || b.packWidth - a.packWidth || b.packLength * b.packWidth - a.packLength * a.packWidth) },
+    { label: "CP-SAT + szerokosc", items: base.slice().sort((a, b) => b.packWidth - a.packWidth || b.packLength - a.packLength || b.packLength * b.packWidth - a.packLength * a.packWidth) },
+    { label: "CP-SAT + mieszane typy", items: roundRobinOrder(base) }
+  ];
+
+  const fallback = { label: "CP-SAT + kompresja", placed: compactPlacedItems(base, trailer) };
+  let best = null;
+  let bestScore = null;
+  for (const order of orders) {
+    for (const candidate of [
+      skylineRepack(order.items, trailer, allowRotate, gap, `${order.label} skyline`),
+      maxRectsRepack(order.items, trailer, allowRotate, gap, `${order.label} max-rects`)
+    ]) {
+      if (!candidate) continue;
+      const score = layoutScoreTuple(candidate.placed, trailer);
+      if (!best || compareTuple(score, bestScore) < 0) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+  }
+  if (!best) best = fallback;
+  best.placed.sort((a, b) => a.x - b.x || a.y - b.y);
+  return best;
+}
+
+function buildTrailerSummary(trailerPlaced, trailer, trailerIndex, strategyLabel, method) {
+  const normalized = trailerPlaced.map((item) => ({ ...item, trailerIndex }));
+  normalized.sort((a, b) => a.x - b.x || a.y - b.y);
+  const usedLen = normalized.reduce((max, item) => Math.max(max, item.x + item.length), 0);
+  const usedWid = normalized.reduce((max, item) => Math.max(max, item.y + item.width), 0);
+  const packUsedLen = normalized.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+  const packUsedWid = normalized.reduce((max, item) => Math.max(max, item.y + item.packWidth), 0);
+  const placedArea = normalized.reduce((sum, item) => sum + item.area, 0);
+  return {
+    index: trailerIndex,
+    placed: normalized,
+    usedLength: usedLen,
+    usedWidth: usedWid,
+    packUsedLength: packUsedLen,
+    packUsedWidth: packUsedWid,
+    fill: placedArea / Math.max(1, trailer.length * trailer.width),
+    placedArea,
+    strategyLabel,
+    method
+  };
+}
+
 function linearSum(terms) {
   if (terms.length === 0) return 0;
   let expr = toExpr(terms[0]);
@@ -286,11 +589,14 @@ function solveCpSatLayout(solver, payload, requestId) {
 
   const used = [];
   const usedLength = [];
+  const usedWidth = [];
   const assign = [];
   for (let k = 0; k < upperBound; k++) {
     used[k] = model.newBoolVar(`used_${k}`);
     usedLength[k] = model.newIntVar(0, trailer.length, `used_len_${k}`);
+    usedWidth[k] = model.newIntVar(0, trailer.width, `used_wid_${k}`);
     model.add(usedLength[k].le(used[k].times(trailer.length)));
+    model.add(usedWidth[k].le(used[k].times(trailer.width)));
     if (k > 0) model.add(used[k].le(used[k - 1]));
   }
 
@@ -300,6 +606,7 @@ function solveCpSatLayout(solver, payload, requestId) {
       assign[i][k] = model.newBoolVar(`a_${i}_${k}`);
       model.add(assign[i][k].le(used[k]));
       model.add(usedLength[k].ge(x[i].plus(packLength[i]))).onlyEnforceIf(assign[i][k]);
+      model.add(usedWidth[k].ge(y[i].plus(packWidth[i]))).onlyEnforceIf(assign[i][k]);
     }
     exactlyOne(model, assign[i]);
   }
@@ -328,10 +635,18 @@ function solveCpSatLayout(solver, payload, requestId) {
     }
   }
 
-  const trailerWeight = trailer.length * items.length + trailer.length + 1;
+  const compactBound =
+    items.length * (trailer.length * 4 + trailer.width * 2) +
+    upperBound * trailer.width +
+    1;
+  const lengthWeight = compactBound + 1;
+  const trailerWeight = upperBound * trailer.length * lengthWeight + compactBound + 1;
   const objectiveTerms = [
     ...used.map((varItem) => varItem.times(trailerWeight)),
-    ...usedLength
+    ...usedLength.map((varItem) => varItem.times(lengthWeight)),
+    ...usedWidth,
+    ...x.map((varItem) => varItem.times(4)),
+    ...y.map((varItem) => varItem.times(2))
   ];
   model.minimize(linearSum(objectiveTerms));
 
@@ -381,25 +696,19 @@ function solveCpSatLayout(solver, payload, requestId) {
     }
     trailerPlaced.sort((a, b) => a.x - b.x || a.y - b.y);
     const trailerIndex = trailers.length + 1;
-    for (const item of trailerPlaced) item.trailerIndex = trailerIndex;
-    const usedLen = trailerPlaced.reduce((max, item) => Math.max(max, item.x + item.length), 0);
-    const usedWid = trailerPlaced.reduce((max, item) => Math.max(max, item.y + item.width), 0);
-    const packUsedLen = trailerPlaced.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
-    const packUsedWid = trailerPlaced.reduce((max, item) => Math.max(max, item.y + item.packWidth), 0);
-    const placedArea = trailerPlaced.reduce((sum, item) => sum + item.area, 0);
-    trailers.push({
-      index: trailerIndex,
-      placed: trailerPlaced,
-      usedLength: usedLen,
-      usedWidth: usedWid,
-      packUsedLength: packUsedLen,
-      packUsedWidth: packUsedWid,
-      fill: placedArea / Math.max(1, trailer.length * trailer.width),
-      placedArea,
-      strategyLabel: result.status === CpSolverStatus.OPTIMAL ? "OR-Tools CP-SAT exact" : "OR-Tools CP-SAT feasible",
-      method: "WASM CP-SAT"
-    });
-    placed.push(...trailerPlaced);
+    const repacked = repackTrailerLayout(trailerPlaced, trailer, allowRotate, gap);
+    const strategyLabel = result.status === CpSolverStatus.OPTIMAL
+      ? `OR-Tools CP-SAT exact, ${repacked.label}`
+      : `OR-Tools CP-SAT feasible, ${repacked.label}`;
+    const trailerSummary = buildTrailerSummary(
+      repacked.placed,
+      trailer,
+      trailerIndex,
+      strategyLabel,
+      "WASM CP-SAT + skyline/max-rects"
+    );
+    trailers.push(trailerSummary);
+    placed.push(...trailerSummary.placed);
   }
 
   const placedArea = placed.reduce((sum, item) => sum + item.area, 0);
@@ -422,8 +731,10 @@ function solveCpSatLayout(solver, payload, requestId) {
     trailerWidth: trailer.width,
     fill: trailerCount > 0 ? placedArea / (trailerArea * trailerCount) : 0,
     freeArea: Math.max(0, trailerArea * trailerCount - placedArea),
-    strategyLabel: result.status === CpSolverStatus.OPTIMAL ? "OR-Tools CP-SAT exact" : "OR-Tools CP-SAT feasible",
-    method: "WASM CP-SAT",
+    strategyLabel: result.status === CpSolverStatus.OPTIMAL
+      ? "OR-Tools CP-SAT exact + repack"
+      : "OR-Tools CP-SAT feasible + repack",
+    method: "WASM CP-SAT + skyline/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
     layoutVariant: Math.max(0, Math.floor(payload.layoutVariant || 0)),

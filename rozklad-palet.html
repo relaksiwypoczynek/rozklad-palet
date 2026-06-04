@@ -1138,6 +1138,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
+    const APP_VERSION = "2026-06-04.2";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -2626,7 +2627,7 @@
     }
 
     function createCpSatWorker() {
-      return new Worker(new URL("solver-cpsat-worker.js", window.location.href), { type: "module" });
+      return new Worker(new URL(`solver-cpsat-worker.js?v=${APP_VERSION}`, window.location.href), { type: "module" });
     }
 
     function solveWithCpSatWorker(payload, token) {
