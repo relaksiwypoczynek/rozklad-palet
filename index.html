@@ -1229,7 +1229,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.15";
+    const APP_VERSION = "2026-06-04.16";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -4914,10 +4914,27 @@
       return { ctx, width, height };
     }
 
+    function visualTrailerCount(plan) {
+      const declaredCount = Math.max(0, Math.floor(plan.trailerCount || 0));
+      const trailerListCount = Array.isArray(plan.trailers)
+        ? plan.trailers.reduce((max, trailer, index) => Math.max(max, Math.floor(trailer.index || index + 1)), plan.trailers.length)
+        : 0;
+      const placedCount = Array.isArray(plan.placed)
+        ? plan.placed.reduce((max, pallet) => Math.max(max, Math.floor(pallet.trailerIndex || 1)), 0)
+        : 0;
+      return Math.max(1, declaredCount, trailerListCount, placedCount);
+    }
+
     function visualTrailerPlans(plan) {
-      if (plan.trailers?.length) return plan.trailers;
-      const count = Math.max(1, Math.floor(plan.trailerCount || 1));
-      return Array.from({ length: count }, (_, index) => ({ index: index + 1, placed: [] }));
+      const count = visualTrailerCount(plan);
+      const byIndex = new Map();
+      if (Array.isArray(plan.trailers)) {
+        plan.trailers.forEach((trailer, index) => {
+          const trailerIndex = Math.max(1, Math.floor(trailer.index || index + 1));
+          byIndex.set(trailerIndex, { ...trailer, index: trailerIndex });
+        });
+      }
+      return Array.from({ length: count }, (_, index) => byIndex.get(index + 1) || { index: index + 1, placed: [] });
     }
 
     function trailerVisualMetrics(plan) {
