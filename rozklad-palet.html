@@ -1226,7 +1226,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.9";
+    const APP_VERSION = "2026-06-04.10";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1325,6 +1325,13 @@
         qtyAria: (name) => `Ilość palet ${name}`,
         deleteAria: (name) => `Usuń ${name}`,
         progressMeta: ({ percent, elapsed, remaining }) => `${percent}% czasu, minęło ${elapsed}, zostało maks. ${remaining}`,
+        solverTrailer: ({ index }) => `Liczenie naczepy ${formatInt(index)}...`,
+        calculatingCpSat: "Liczenie OR-Tools CP-SAT...",
+        cpsatLoading: "Ładowanie silnika OR-Tools CP-SAT...",
+        cpsatBuilding: "Budowanie modelu exact 2D...",
+        cpsatRange: ({ count, lower, upper }) =>
+          `OR-Tools CP-SAT: ${formatInt(count)} palet, naczepy ${formatInt(lower)}-${formatInt(upper)}...`,
+        cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optymalizacja do ${formatInt(seconds)}s...`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategia: ${strategy}, metoda: ${method}${variantText}, liczenie: ${quality}.`,
         addAtLeastOne: "Dodaj co najmniej jedną paletę z ilością większą od zera.",
@@ -1427,6 +1434,13 @@
         qtyAria: (name) => `Pallet quantity ${name}`,
         deleteAria: (name) => `Delete ${name}`,
         progressMeta: ({ percent, elapsed, remaining }) => `${percent}% of time, elapsed ${elapsed}, max remaining ${remaining}`,
+        solverTrailer: ({ index }) => `Calculating trailer ${formatInt(index)}...`,
+        calculatingCpSat: "Calculating OR-Tools CP-SAT...",
+        cpsatLoading: "Loading OR-Tools CP-SAT engine...",
+        cpsatBuilding: "Building exact 2D model...",
+        cpsatRange: ({ count, lower, upper }) =>
+          `OR-Tools CP-SAT: ${formatInt(count)} pallets, trailers ${formatInt(lower)}-${formatInt(upper)}...`,
+        cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimizing for up to ${formatInt(seconds)}s...`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategy: ${strategy}, method: ${method}${variantText}, calculation: ${quality}.`,
         addAtLeastOne: "Add at least one pallet with quantity greater than zero.",
@@ -1529,6 +1543,13 @@
         qtyAria: (name) => `Aantal pallets ${name}`,
         deleteAria: (name) => `${name} verwijderen`,
         progressMeta: ({ percent, elapsed, remaining }) => `${percent}% van tijd, verstreken ${elapsed}, max. resterend ${remaining}`,
+        solverTrailer: ({ index }) => `Oplegger ${formatInt(index)} berekenen...`,
+        calculatingCpSat: "OR-Tools CP-SAT berekenen...",
+        cpsatLoading: "OR-Tools CP-SAT-engine laden...",
+        cpsatBuilding: "Exact 2D-model opbouwen...",
+        cpsatRange: ({ count, lower, upper }) =>
+          `OR-Tools CP-SAT: ${formatInt(count)} pallets, opleggers ${formatInt(lower)}-${formatInt(upper)}...`,
+        cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimaliseren tot ${formatInt(seconds)}s...`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategie: ${strategy}, methode: ${method}${variantText}, berekening: ${quality}.`,
         addAtLeastOne: "Voeg minimaal één pallet toe met een aantal groter dan nul.",
@@ -1832,6 +1853,38 @@
       const parts = text.split(" + ");
       if (parts.length > 1) return parts.map((part) => planLabel(part)).join(" + ");
       return text.replaceAll("mieszana", labels.mieszana || "mieszana");
+    }
+
+    function progressText(data, fallbackKey = "calculating") {
+      const payload = data || {};
+      if (payload.messageKey) {
+        return t(payload.messageKey, payload.params || {});
+      }
+
+      const message = String(payload.message || "");
+      let match = message.match(/Liczenie naczepy\s+(\d+)/i);
+      if (match) return t("solverTrailer", { index: Number(match[1]) });
+
+      if (/Ladowanie silnika OR-Tools CP-SAT|Ładowanie silnika OR-Tools CP-SAT/i.test(message)) {
+        return t("cpsatLoading");
+      }
+      if (/Budowanie modelu exact 2D/i.test(message)) {
+        return t("cpsatBuilding");
+      }
+
+      match = message.match(/OR-Tools CP-SAT:\s+(\d+)\s+palet,\s+naczepy\s+(\d+)-(\d+)/i);
+      if (match) {
+        return t("cpsatRange", {
+          count: Number(match[1]),
+          lower: Number(match[2]),
+          upper: Number(match[3])
+        });
+      }
+
+      match = message.match(/OR-Tools CP-SAT:\s+optymalizacja do\s+(\d+)s/i);
+      if (match) return t("cpsatOptimizing", { seconds: Number(match[1]) });
+
+      return message || t(fallbackKey);
     }
 
     function applyTranslations() {
@@ -2205,8 +2258,8 @@
           };
         }
 
-        function progress(requestId, message, detail) {
-          self.postMessage({ type: "progress", requestId, message, detail: detail || "" });
+        function progress(requestId, messageKey, params, detail) {
+          self.postMessage({ type: "progress", requestId, messageKey, params: params || {}, detail: detail || "" });
         }
 
         function expandItems(rows, gap) {
@@ -3102,7 +3155,7 @@
           const baseSeed = mixSeed(items.length, trailer.length, trailer.width, payload.layoutVariant || 0, payload.gap || 0);
 
           while (unplaced.length > 0 && nowMs() < deadline) {
-            progress(requestId, "Liczenie naczepy " + trailerIndex + "...");
+            progress(requestId, "solverTrailer", { index: trailerIndex });
             const trailerPlan = solveOneTrailer(unplaced, trailer, payload.allowRotate !== false, config, mixSeed(baseSeed, trailerIndex), deadline);
             if (!trailerPlan || trailerPlan.placed.length === 0) break;
             const trailerPlaced = trailerPlan.placed.map((item) => ({ ...item, trailerIndex }));
@@ -3175,7 +3228,11 @@
           const data = event.data || {};
           if (data.requestId !== requestId) return;
           if (data.type === "progress") {
-            if (token === calculationToken) setCalculating(true, data.message || "Liczenie układu...", { budgetMs: payload.maxTimeSeconds ? payload.maxTimeSeconds * 1000 : undefined });
+            if (token === calculationToken) {
+              setCalculating(true, progressText(data, "calculating"), {
+                budgetMs: payload.maxTimeSeconds ? payload.maxTimeSeconds * 1000 : undefined
+              });
+            }
             return;
           }
           worker.terminate();
@@ -3216,7 +3273,11 @@
           const data = event.data || {};
           if (data.requestId !== requestId) return;
           if (data.type === "progress") {
-            if (token === calculationToken) setCalculating(true, data.message || "Liczenie OR-Tools CP-SAT...", { budgetMs: payload.maxTimeSeconds ? payload.maxTimeSeconds * 1000 : undefined });
+            if (token === calculationToken) {
+              setCalculating(true, progressText(data, "calculatingCpSat"), {
+                budgetMs: payload.maxTimeSeconds ? payload.maxTimeSeconds * 1000 : undefined
+              });
+            }
             return;
           }
           worker.terminate();

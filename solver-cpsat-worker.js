@@ -7,9 +7,9 @@ self.onmessage = async (event) => {
   if (!requestId || !payload) return;
 
   try {
-    progress(requestId, "Ladowanie silnika OR-Tools CP-SAT...");
+    progress(requestId, "cpsatLoading");
     const solver = await getSolver();
-    progress(requestId, "Budowanie modelu exact 2D...");
+    progress(requestId, "cpsatBuilding");
     const plan = solveCpSatLayout(solver, payload, requestId);
     self.postMessage({ type: "result", requestId, plan });
   } catch (error) {
@@ -30,8 +30,8 @@ async function getSolver() {
   return cachedSolver;
 }
 
-function progress(requestId, message, detail = "") {
-  self.postMessage({ type: "progress", requestId, message, detail });
+function progress(requestId, messageKey, params = {}, detail = "") {
+  self.postMessage({ type: "progress", requestId, messageKey, params, detail });
 }
 
 function clampNumber(value, min, fallback) {
@@ -701,7 +701,7 @@ function solveCpSatLayout(solver, payload, requestId) {
   const upperBound = greedyUpperBound(items, trailer, allowRotate);
   if (!upperBound) throw new Error("Co najmniej jedna paleta nie miesci sie na naczepie w zadnej orientacji.");
 
-  progress(requestId, `OR-Tools CP-SAT: ${items.length} palet, naczepy ${lowerBound}-${upperBound}...`);
+  progress(requestId, "cpsatRange", { count: items.length, lower: lowerBound, upper: upperBound });
 
   const model = new CpModel("pallet_2d_bin_packing");
   const x = [];
@@ -800,7 +800,7 @@ function solveCpSatLayout(solver, payload, requestId) {
   model.minimize(linearSum(objectiveTerms));
 
   const maxTimeInSeconds = Math.max(1, Math.floor(clampNumber(payload.maxTimeSeconds, 1, 180)));
-  progress(requestId, `OR-Tools CP-SAT: optymalizacja do ${maxTimeInSeconds}s...`);
+  progress(requestId, "cpsatOptimizing", { seconds: maxTimeInSeconds });
   const result = solver.solve(model, {
     maxTimeInSeconds,
     numWorkers: 1
