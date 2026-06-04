@@ -1183,7 +1183,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.5";
+    const APP_VERSION = "2026-06-04.6";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -4151,8 +4151,8 @@
         }
       }
       if (issues.length === 0) {
-        if (plan.method === "WASM CP-SAT") {
-          const statusText = plan.status === "OPTIMAL" ? "optymalność potwierdzona" : "najlepszy znaleziony wynik w limicie czasu";
+        if (String(plan.method || "").startsWith("WASM CP-SAT")) {
+          const statusText = plan.status === "OPTIMAL" ? "optymalność potwierdzona" : "najlepszy znaleziony wynik w limicie czasu, bez dowodu optimum";
           issues.push({ kind: "info", text: `Plan policzony silnikiem OR-Tools CP-SAT WebAssembly: ${statusText}. Model: ${formatInt(plan.variantCount || 0)} zmiennych, ${formatInt(plan.candidateCount || 0)} ograniczeń.` });
         } else {
           const testedLayouts = Math.max(plan.candidateCount || 0, plan.variantCount || 0, packVariantCount(plan.searchQuality));
