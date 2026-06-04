@@ -153,14 +153,24 @@
     .header-inner {
       width: min(1720px, calc(100vw - 32px));
       margin: 0 auto;
-      min-height: 70px;
+      min-height: 74px;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: stretch;
       justify-content: space-between;
-      gap: 18px;
+      gap: 6px;
+      padding: 12px 0;
     }
 
     .brand {
+      min-width: 0;
+    }
+
+    .header-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       min-width: 0;
     }
 
@@ -183,7 +193,8 @@
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
-      justify-content: flex-end;
+      justify-content: flex-start;
+      margin-top: 10px;
     }
 
     .language-select {
@@ -348,11 +359,22 @@
       grid-template-columns: minmax(0, 1fr) 92px auto;
       gap: 10px;
       align-items: end;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       padding: 12px;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: var(--panel-soft);
+    }
+
+    .loads-count-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .custom-add-fields {
@@ -464,7 +486,7 @@
     .loads-footer {
       display: flex;
       align-items: flex-end;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: 10px;
       margin-top: 10px;
       color: var(--muted);
@@ -491,6 +513,10 @@
       color: var(--muted);
       font-size: 12px;
       font-weight: 650;
+    }
+
+    .hidden-select {
+      display: none;
     }
 
     .color-cell {
@@ -751,7 +777,7 @@
       display: none;
       place-items: start center;
       box-sizing: border-box;
-      padding: 34px 12px 0;
+      padding: 82px 12px 0;
       background: rgba(248, 250, 252, 0.72);
       pointer-events: none;
     }
@@ -864,9 +890,13 @@
       }
 
       .header-inner {
-        align-items: flex-start;
         flex-direction: column;
+        align-items: stretch;
         padding: 14px 0;
+      }
+
+      .header-topline {
+        width: 100%;
       }
 
       .header-actions {
@@ -877,8 +907,6 @@
       }
 
       .language-select {
-        grid-column: 2;
-        justify-self: end;
         max-width: 128px;
       }
 
@@ -1024,7 +1052,7 @@
       }
 
       .calc-overlay {
-        padding: 24px 8px 0;
+        padding: 78px 8px 0;
       }
 
       .calc-badge {
@@ -1043,12 +1071,12 @@
 
       .calc-controls {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         width: 100%;
       }
 
-      .calc-mode-inline {
-        min-width: 0;
+      .calc-controls button {
+        width: 100%;
       }
     }
   </style>
@@ -1057,17 +1085,18 @@
   <header class="app-header">
     <div class="header-inner">
       <div class="brand">
-        <h1>LoadPallet</h1>
+        <div class="header-topline">
+          <h1>LoadPallet</h1>
+          <select id="languageSelect" class="language-select" aria-label="Język">
+            <option value="pl">Polski</option>
+            <option value="en">English</option>
+            <option value="nl">Nederlands</option>
+          </select>
+        </div>
         <p>Optymalizator ułożenia palet na naczepie.</p>
       </div>
       <div class="header-actions">
-        <select id="languageSelect" class="language-select" aria-label="Język">
-          <option value="pl">Polski</option>
-          <option value="en">English</option>
-          <option value="nl">Nederlands</option>
-        </select>
         <button id="resetDemoBtn" type="button">Wyczyść listę</button>
-        <button id="csvBtn" type="button">CSV</button>
         <button id="printBtn" type="button">Drukuj</button>
       </div>
     </div>
@@ -1140,6 +1169,9 @@
             </div>
           </div>
         </div>
+        <div class="loads-count-row">
+          <span id="loadsCount">Dodano 0 palet</span>
+        </div>
         <div class="table-wrap">
           <table aria-label="Lista palet">
             <thead>
@@ -1154,15 +1186,15 @@
         </div>
         <p id="emptyLoads" class="empty-state loads-empty">Brak palet do ułożenia.</p>
         <div class="loads-footer">
-          <span id="loadsCount">Dodano 0 palet</span>
           <div class="calc-controls">
-            <label class="calc-mode-inline" for="searchQuality">
+            <label class="calc-mode-inline hidden-select" for="searchQuality">
               <span>Tryb liczenia</span>
               <select id="searchQuality">
                 <option value="fast">Szybki</option>
                 <option value="deep">Optymalny</option>
               </select>
             </label>
+            <button id="refreshBtn" type="button">Odśwież</button>
             <button id="recalcBtn" class="primary" type="button">Przelicz</button>
             <button id="stopCalcBtn" class="danger stop-button" type="button" hidden>STOP</button>
           </div>
@@ -1244,7 +1276,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.02";
+    const APP_VERSION = "2026-06-05.03";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1281,6 +1313,7 @@
         pallet: "Paleta",
         actions: "Akcje",
         emptyLoads: "Brak palet do ułożenia.",
+        refresh: "Odśwież",
         recalc: "Przelicz",
         recalcAgain: "Przelicz ponownie",
         stop: "STOP",
@@ -1390,6 +1423,7 @@
         pallet: "Pallet",
         actions: "Actions",
         emptyLoads: "No pallets to arrange.",
+        refresh: "Refresh",
         recalc: "Calculate",
         recalcAgain: "Calculate again",
         stop: "STOP",
@@ -1499,6 +1533,7 @@
         pallet: "Pallet",
         actions: "Acties",
         emptyLoads: "Geen pallets om te plaatsen.",
+        refresh: "Vernieuwen",
         recalc: "Berekenen",
         recalcAgain: "Opnieuw berekenen",
         stop: "STOP",
@@ -1693,9 +1728,9 @@
       addLoad: document.getElementById("addLoadBtn"),
       language: document.getElementById("languageSelect"),
       resetDemo: document.getElementById("resetDemoBtn"),
+      refresh: document.getElementById("refreshBtn"),
       recalc: document.getElementById("recalcBtn"),
       stop: document.getElementById("stopCalcBtn"),
-      csv: document.getElementById("csvBtn"),
       print: document.getElementById("printBtn"),
       canvas: document.getElementById("deckCanvas"),
       canvasShell: document.getElementById("canvasShell"),
@@ -1926,6 +1961,7 @@
       setText(".brand h1", t("appTitle"));
       setText(".brand p", t("appSubtitle"));
       el.resetDemo.textContent = t("clearList");
+      el.refresh.textContent = t("refresh");
       el.print.textContent = t("print");
       setText(".summary-main strong", t("settings"));
       setText('label[for="trailerPreset"]', t("preset"));
@@ -2021,7 +2057,7 @@
           : (savedGap === 20 ? DEFAULT_GAP : savedGap);
         state.allowRotate = Boolean(saved.allowRotate);
         state.compactLength = saved.compactLength !== false;
-        state.searchQuality = saved.searchQuality === "fast" ? "fast" : "deep";
+        state.searchQuality = "deep";
         state.language = I18N[saved.language] ? saved.language : "pl";
         state.layoutVariant = Math.floor(clampNumber(saved.layoutVariant, 0, 0));
         state.rows = saved.rows.map((row) => ({
@@ -5274,48 +5310,6 @@
       if (plan) drawDeck(plan);
     }
 
-    async function exportCsv() {
-      if (!currentPlan) await calculateAndRender();
-      if (!currentPlan) return;
-      const header = [
-        "lp",
-        "naczepa",
-        "typ",
-        "x_mm",
-        "y_mm",
-        "dlugosc_mm",
-        "szerokosc_mm",
-        "obrot_90",
-        "kolor"
-      ];
-      const rows = currentPlan.placed
-        .slice()
-        .sort((a, b) => (a.trailerIndex || 1) - (b.trailerIndex || 1) || a.x - b.x || a.y - b.y)
-        .map((item, index) => [
-          index + 1,
-          item.trailerIndex || 1,
-          item.name,
-          Math.round(item.x),
-          Math.round(item.y),
-          Math.round(item.length),
-          Math.round(item.width),
-          item.rotated ? "tak" : "nie",
-          item.color
-        ]);
-      const csv = [header, ...rows]
-        .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
-        .join("\r\n");
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "rozklad-palet.csv";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    }
-
     function bindEvents() {
       el.trailerPreset.addEventListener("change", () => {
         const preset = TRAILER_PRESETS.find((item) => item.key === el.trailerPreset.value);
@@ -5400,6 +5394,11 @@
         calculateAndRender({ auto: true });
       });
 
+      el.refresh.addEventListener("click", () => {
+        readGlobalInputs();
+        calculateAndRender({ auto: true });
+      });
+
       el.recalc.addEventListener("click", () => {
         readGlobalInputs();
         if (hasCalculated) {
@@ -5412,7 +5411,6 @@
 
       el.stop.addEventListener("click", cancelCalculation);
 
-      el.csv.addEventListener("click", () => exportCsv());
       el.print.addEventListener("click", () => window.print());
 
       el.canvas.addEventListener("mousemove", (event) => showTooltip(hitTestPallet(event.clientX, event.clientY)));
