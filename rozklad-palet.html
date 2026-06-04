@@ -172,6 +172,15 @@
       justify-content: flex-end;
     }
 
+    .language-select {
+      width: auto;
+      min-width: 92px;
+      min-height: 34px;
+      padding: 6px 8px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
     .app-shell {
       width: min(1720px, calc(100vw - 32px));
       margin: 18px auto 26px;
@@ -828,6 +837,12 @@
         width: 100%;
       }
 
+      .language-select {
+        grid-column: 2;
+        justify-self: end;
+        max-width: 128px;
+      }
+
       .header-actions button {
         width: 100%;
         min-height: 40px;
@@ -988,6 +1003,11 @@
         <p>Jednoplikowy kalkulator 2D dla jednej warstwy palet.</p>
       </div>
       <div class="header-actions">
+        <select id="languageSelect" class="language-select" aria-label="Język">
+          <option value="pl">Polski</option>
+          <option value="en">English</option>
+          <option value="nl">Nederlands</option>
+        </select>
         <button id="resetDemoBtn" type="button">Wyczyść listę</button>
         <button id="csvBtn" type="button">CSV</button>
         <button id="printBtn" type="button">Drukuj</button>
@@ -1183,13 +1203,322 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.6";
+    const APP_VERSION = "2026-06-04.7";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
     const SEARCH_QUALITY = {
       fast: { label: "Szybki", randomRuns: 4, budgetMs: 900, beamScale: 0.62, branchScale: 0.68 },
       deep: { label: "Optymalny", randomRuns: 180, budgetMs: 180000, beamScale: 1.85, branchScale: 1.72 }
+    };
+
+    const I18N = {
+      pl: {
+        locale: "pl-PL",
+        languageAria: "Język",
+        documentTitle: "Rozkład palet na naczepie",
+        appTitle: "Rozkład palet na naczepie",
+        appSubtitle: "Jednoplikowy kalkulator 2D dla jednej warstwy palet.",
+        clearList: "Wyczyść listę",
+        print: "Drukuj",
+        trailer: "Naczepa",
+        preset: "Preset",
+        length: "Długość [mm]",
+        width: "Szerokość [mm]",
+        settings: "Ustawienia",
+        gap: "Luz [mm]",
+        calcMode: "Tryb liczenia",
+        fast: "Szybki",
+        optimal: "Optymalny",
+        rotate: "Obrót 90°",
+        compact: "Kompaktuj LDM",
+        pallets: "Palety",
+        size: "Rozmiar",
+        quantity: "Ilość",
+        add: "Dodaj",
+        name: "Nazwa",
+        pallet: "Paleta",
+        actions: "Akcje",
+        emptyLoads: "Brak palet do ułożenia.",
+        recalc: "Przelicz",
+        assumptions: "Założenia danych",
+        placed: "Ułożono",
+        fill: "Wypełnienie",
+        ldmTotal: "LDM razem",
+        trailers: "Naczepy",
+        missing: "Nieułożone",
+        topView: "Widok z góry",
+        noData: "Brak danych do obliczenia.",
+        alternate: "Inny układ",
+        ready: "Gotowe",
+        deckAria: "Rzut naczepy z paletami",
+        calculating: "Liczenie układu...",
+        calcStart: "Start...",
+        legend: "Legenda",
+        messages: "Komunikaty",
+        footnote: "Model uwzględnia tylko footprint na podłodze. Masa, środek ciężkości, naciski na osie, wysokość ładunku, pasy, kliny i kolejność rozładunku wymagają osobnej kontroli operacyjnej.",
+        customTrailer: "Własne wymiary",
+        customPallet: "Nietypowa / własna",
+        customName: "Własna",
+        delete: "Usuń",
+        noPalletsInPlan: "Brak palet w planie.",
+        allPlaced: "Wszystko ułożone",
+        hasUnplaced: "Są nieułożone palety",
+        quickCalc: "szybkie",
+        variant: "wariant",
+        strategy: "strategia",
+        method: "metoda",
+        calculation: "liczenie",
+        tractorTop: "ciągnik u góry",
+        trailerLabel: "Naczepa",
+        position: "Pozycja",
+        dimension: "Wymiar",
+        orientation: "Orientacja",
+        rotated: "obrócona",
+        base: "bazowa",
+        planLabels: {
+          "mieszana": "mieszana",
+          "worker mieszany": "worker mieszany",
+          "Brak": "brak",
+          "none": "brak",
+          "Największa powierzchnia": "największa powierzchnia",
+          "Najdłuższy bok": "najdłuższy bok",
+          "Długość": "długość",
+          "Szerokość": "szerokość",
+          "Kolejność z tabeli": "kolejność z tabeli",
+          "Małe pierwsze": "małe pierwsze",
+          "kombinacje rzedow": "kombinacje rzędów",
+          "kombinacje geste": "kombinacje gęste",
+          "kombinacje LDM": "kombinacje LDM",
+          "kombinacje bez grupowania": "kombinacje bez grupowania",
+          "wariant zaawansowany": "wariant zaawansowany",
+          "dosuniecie skyline": "dosunięcie skyline",
+          "skyline pole": "skyline pole",
+          "skyline dlugosc": "skyline długość",
+          "skyline szerokosc": "skyline szerokość",
+          "worker": "worker"
+        },
+        added: (count) => `Dodano ${count}`,
+        qtyAria: (name) => `Ilość palet ${name}`,
+        deleteAria: (name) => `Usuń ${name}`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% czasu, minęło ${elapsed}, zostało maks. ${remaining}`,
+        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
+          `${trailerText}, ${trailerLabel}, strategia: ${strategy}, metoda: ${method}${variantText}, liczenie: ${quality}.`,
+        addAtLeastOne: "Dodaj co najmniej jedną paletę z ilością większą od zera.",
+        unplacedItem: ({ name, count }) => `Nie zmieszczono: ${name} - ${count} szt.`,
+        loadSplit: (count) => `Ładunek rozłożono na ${count}.`,
+        tooLarge: (name) => `${name || "Paleta"} jest większa niż dostępny footprint naczepy.`,
+        cpsatStatusOptimal: "optymalność potwierdzona",
+        cpsatStatusFeasible: "najlepszy znaleziony wynik w limicie czasu, bez dowodu optimum",
+        cpsatInfo: ({ status, variables, constraints }) =>
+          `Plan policzony silnikiem OR-Tools CP-SAT WebAssembly: ${status}. Model: ${variables} zmiennych, ${constraints} ograniczeń.`,
+        heuristicInfo: (count) => `Plan wybrany z ${count} kandydatów heurystyki, w tym z mieszania rozmiarów, MaxRects i dosuwania skyline.`,
+        sourceHtml: `<li>EPAL: EPAL 1 ma wymiar 800 x 1200 mm, EPAL 2 ma 1200 x 1000 mm, EPAL 6 ma 800 x 600 mm. Źródło: <a href="https://epal.org.pl/palety/" target="_blank" rel="noreferrer">Polski Komitet Narodowy EPAL</a>.</li><li>ISO 6780:2003 określa główne wymiary i tolerancje palet płaskich; publiczne zestawienia ISO 6780 podają sześć footprintów użytych w presetach. Źródła: <a href="https://www.iso.org/standard/30524.html" target="_blank" rel="noreferrer">ISO</a>, <a href="https://palletizing.com/wp-content/uploads/2017/11/Science-of-Palletizing.pdf" target="_blank" rel="noreferrer">tabela wymiarów</a>.</li><li>Naczepa KRONE Profi Liner: przestrzeń ładunkowa 13620 x 2480 mm. Źródło: <a href="https://www.krone-trailer.com/en/products/curtain-semitrailer/profi-liner/" target="_blank" rel="noreferrer">KRONE</a>.</li>`
+      },
+      en: {
+        locale: "en-US",
+        languageAria: "Language",
+        documentTitle: "Pallet layout on trailer",
+        appTitle: "Pallet layout on trailer",
+        appSubtitle: "Single-file 2D calculator for one pallet layer.",
+        clearList: "Clear list",
+        print: "Print",
+        trailer: "Trailer",
+        preset: "Preset",
+        length: "Length [mm]",
+        width: "Width [mm]",
+        settings: "Settings",
+        gap: "Clearance [mm]",
+        calcMode: "Calculation mode",
+        fast: "Fast",
+        optimal: "Optimal",
+        rotate: "Rotate 90°",
+        compact: "Compact LDM",
+        pallets: "Pallets",
+        size: "Size",
+        quantity: "Qty",
+        add: "Add",
+        name: "Name",
+        pallet: "Pallet",
+        actions: "Actions",
+        emptyLoads: "No pallets to arrange.",
+        recalc: "Calculate",
+        assumptions: "Data assumptions",
+        placed: "Placed",
+        fill: "Fill",
+        ldmTotal: "Total LDM",
+        trailers: "Trailers",
+        missing: "Unplaced",
+        topView: "Top view",
+        noData: "No data to calculate.",
+        alternate: "Another layout",
+        ready: "Ready",
+        deckAria: "Top-down trailer layout with pallets",
+        calculating: "Calculating layout...",
+        calcStart: "Start...",
+        legend: "Legend",
+        messages: "Messages",
+        footnote: "The model only considers the floor footprint. Weight, center of gravity, axle loads, load height, straps, wedges and unloading order require a separate operational check.",
+        customTrailer: "Custom dimensions",
+        customPallet: "Custom / non-standard",
+        customName: "Custom",
+        delete: "Delete",
+        noPalletsInPlan: "No pallets in the plan.",
+        allPlaced: "Everything placed",
+        hasUnplaced: "Some pallets are unplaced",
+        quickCalc: "fast",
+        variant: "variant",
+        strategy: "strategy",
+        method: "method",
+        calculation: "calculation",
+        tractorTop: "tractor at top",
+        trailerLabel: "Trailer",
+        position: "Position",
+        dimension: "Dimension",
+        orientation: "Orientation",
+        rotated: "rotated",
+        base: "base",
+        planLabels: {
+          "mieszana": "mixed",
+          "worker mieszany": "mixed worker",
+          "Brak": "none",
+          "none": "none",
+          "Największa powierzchnia": "largest area",
+          "Najdłuższy bok": "longest side",
+          "Długość": "length",
+          "Szerokość": "width",
+          "Kolejność z tabeli": "table order",
+          "Małe pierwsze": "small first",
+          "kombinacje rzedow": "row combinations",
+          "kombinacje geste": "dense combinations",
+          "kombinacje LDM": "LDM combinations",
+          "kombinacje bez grupowania": "anti-grouping combinations",
+          "wariant zaawansowany": "advanced variant",
+          "dosuniecie skyline": "skyline push",
+          "skyline pole": "skyline area",
+          "skyline dlugosc": "skyline length",
+          "skyline szerokosc": "skyline width",
+          "worker": "worker"
+        },
+        added: (count) => `Added ${count}`,
+        qtyAria: (name) => `Pallet quantity ${name}`,
+        deleteAria: (name) => `Delete ${name}`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% of time, elapsed ${elapsed}, max remaining ${remaining}`,
+        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
+          `${trailerText}, ${trailerLabel}, strategy: ${strategy}, method: ${method}${variantText}, calculation: ${quality}.`,
+        addAtLeastOne: "Add at least one pallet with quantity greater than zero.",
+        unplacedItem: ({ name, count }) => `Not placed: ${name} - ${count} pcs.`,
+        loadSplit: (count) => `Load split across ${count}.`,
+        tooLarge: (name) => `${name || "Pallet"} is larger than the available trailer footprint.`,
+        cpsatStatusOptimal: "optimality proven",
+        cpsatStatusFeasible: "best result found within the time limit, without proof of optimum",
+        cpsatInfo: ({ status, variables, constraints }) =>
+          `Plan calculated with OR-Tools CP-SAT WebAssembly: ${status}. Model: ${variables} variables, ${constraints} constraints.`,
+        heuristicInfo: (count) => `Plan selected from ${count} heuristic candidates, including mixed sizes, MaxRects and skyline compaction.`,
+        sourceHtml: `<li>EPAL: EPAL 1 is 800 x 1200 mm, EPAL 2 is 1200 x 1000 mm, EPAL 6 is 800 x 600 mm. Source: <a href="https://epal.org.pl/palety/" target="_blank" rel="noreferrer">Polish National EPAL Committee</a>.</li><li>ISO 6780:2003 defines principal dimensions and tolerances for flat pallets; public ISO 6780 summaries list six footprints used in the presets. Sources: <a href="https://www.iso.org/standard/30524.html" target="_blank" rel="noreferrer">ISO</a>, <a href="https://palletizing.com/wp-content/uploads/2017/11/Science-of-Palletizing.pdf" target="_blank" rel="noreferrer">dimension table</a>.</li><li>KRONE Profi Liner trailer: loading space 13620 x 2480 mm. Source: <a href="https://www.krone-trailer.com/en/products/curtain-semitrailer/profi-liner/" target="_blank" rel="noreferrer">KRONE</a>.</li>`
+      },
+      nl: {
+        locale: "nl-NL",
+        languageAria: "Taal",
+        documentTitle: "Palletindeling op oplegger",
+        appTitle: "Palletindeling op oplegger",
+        appSubtitle: "2D-calculator in één bestand voor één laag pallets.",
+        clearList: "Lijst wissen",
+        print: "Afdrukken",
+        trailer: "Oplegger",
+        preset: "Preset",
+        length: "Lengte [mm]",
+        width: "Breedte [mm]",
+        settings: "Instellingen",
+        gap: "Speling [mm]",
+        calcMode: "Berekeningsmodus",
+        fast: "Snel",
+        optimal: "Optimaal",
+        rotate: "90° draaien",
+        compact: "LDM compact maken",
+        pallets: "Pallets",
+        size: "Maat",
+        quantity: "Aantal",
+        add: "Toevoegen",
+        name: "Naam",
+        pallet: "Pallet",
+        actions: "Acties",
+        emptyLoads: "Geen pallets om te plaatsen.",
+        recalc: "Berekenen",
+        assumptions: "Uitgangspunten",
+        placed: "Geplaatst",
+        fill: "Vulling",
+        ldmTotal: "LDM totaal",
+        trailers: "Opleggers",
+        missing: "Niet geplaatst",
+        topView: "Bovenaanzicht",
+        noData: "Geen gegevens om te berekenen.",
+        alternate: "Andere indeling",
+        ready: "Klaar",
+        deckAria: "Bovenaanzicht van oplegger met pallets",
+        calculating: "Indeling berekenen...",
+        calcStart: "Start...",
+        legend: "Legenda",
+        messages: "Meldingen",
+        footnote: "Het model houdt alleen rekening met de vloer-footprint. Gewicht, zwaartepunt, aslasten, laadhoogte, spanbanden, keggen en losvolgorde vereisen een aparte operationele controle.",
+        customTrailer: "Eigen afmetingen",
+        customPallet: "Afwijkend / eigen",
+        customName: "Eigen",
+        delete: "Verwijderen",
+        noPalletsInPlan: "Geen pallets in het plan.",
+        allPlaced: "Alles geplaatst",
+        hasUnplaced: "Er zijn niet-geplaatste pallets",
+        quickCalc: "snel",
+        variant: "variant",
+        strategy: "strategie",
+        method: "methode",
+        calculation: "berekening",
+        tractorTop: "trekker boven",
+        trailerLabel: "Oplegger",
+        position: "Positie",
+        dimension: "Afmeting",
+        orientation: "Orientatie",
+        rotated: "gedraaid",
+        base: "basis",
+        planLabels: {
+          "mieszana": "gemengd",
+          "worker mieszany": "gemengde worker",
+          "Brak": "geen",
+          "none": "geen",
+          "Największa powierzchnia": "grootste oppervlakte",
+          "Najdłuższy bok": "langste zijde",
+          "Długość": "lengte",
+          "Szerokość": "breedte",
+          "Kolejność z tabeli": "tabelvolgorde",
+          "Małe pierwsze": "klein eerst",
+          "kombinacje rzedow": "rijcombinaties",
+          "kombinacje geste": "dichte combinaties",
+          "kombinacje LDM": "LDM-combinaties",
+          "kombinacje bez grupowania": "combinaties zonder groepering",
+          "wariant zaawansowany": "geavanceerde variant",
+          "dosuniecie skyline": "skyline aanschuiven",
+          "skyline pole": "skyline oppervlakte",
+          "skyline dlugosc": "skyline lengte",
+          "skyline szerokosc": "skyline breedte",
+          "worker": "worker"
+        },
+        added: (count) => `${count} toegevoegd`,
+        qtyAria: (name) => `Aantal pallets ${name}`,
+        deleteAria: (name) => `${name} verwijderen`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% van tijd, verstreken ${elapsed}, max. resterend ${remaining}`,
+        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
+          `${trailerText}, ${trailerLabel}, strategie: ${strategy}, methode: ${method}${variantText}, berekening: ${quality}.`,
+        addAtLeastOne: "Voeg minimaal één pallet toe met een aantal groter dan nul.",
+        unplacedItem: ({ name, count }) => `Niet geplaatst: ${name} - ${count} st.`,
+        loadSplit: (count) => `Lading verdeeld over ${count}.`,
+        tooLarge: (name) => `${name || "Pallet"} is groter dan de beschikbare footprint van de oplegger.`,
+        cpsatStatusOptimal: "optimaliteit bewezen",
+        cpsatStatusFeasible: "beste resultaat binnen de tijdslimiet, zonder bewijs van optimum",
+        cpsatInfo: ({ status, variables, constraints }) =>
+          `Plan berekend met OR-Tools CP-SAT WebAssembly: ${status}. Model: ${variables} variabelen, ${constraints} beperkingen.`,
+        heuristicInfo: (count) => `Plan gekozen uit ${count} heuristische kandidaten, inclusief gemengde maten, MaxRects en skyline-compactie.`,
+        sourceHtml: `<li>EPAL: EPAL 1 is 800 x 1200 mm, EPAL 2 is 1200 x 1000 mm, EPAL 6 is 800 x 600 mm. Bron: <a href="https://epal.org.pl/palety/" target="_blank" rel="noreferrer">Pools Nationaal EPAL Comité</a>.</li><li>ISO 6780:2003 bepaalt hoofdafmetingen en toleranties voor vlakke pallets; openbare ISO 6780-overzichten tonen zes footprints die in de presets zijn gebruikt. Bronnen: <a href="https://www.iso.org/standard/30524.html" target="_blank" rel="noreferrer">ISO</a>, <a href="https://palletizing.com/wp-content/uploads/2017/11/Science-of-Palletizing.pdf" target="_blank" rel="noreferrer">maattabel</a>.</li><li>KRONE Profi Liner oplegger: laadruimte 13620 x 2480 mm. Bron: <a href="https://www.krone-trailer.com/en/products/curtain-semitrailer/profi-liner/" target="_blank" rel="noreferrer">KRONE</a>.</li>`
+      }
     };
 
     const TRAILER_PRESETS = [
@@ -1275,6 +1604,7 @@
       allowRotate: true,
       compactLength: true,
       searchQuality: "deep",
+      language: "pl",
       layoutVariant: 0,
       rows: [],
       nextRowId: 1
@@ -1299,6 +1629,7 @@
       customPalletWidth: document.getElementById("customPalletWidth"),
       customPalletName: document.getElementById("customPalletName"),
       addLoad: document.getElementById("addLoadBtn"),
+      language: document.getElementById("languageSelect"),
       resetDemo: document.getElementById("resetDemoBtn"),
       recalc: document.getElementById("recalcBtn"),
       alternate: document.getElementById("alternateBtn"),
@@ -1341,12 +1672,29 @@
       return Math.max(min, parsed);
     }
 
+    function currentLang() {
+      return I18N[state.language] ? state.language : "pl";
+    }
+
+    function langPack() {
+      return I18N[currentLang()];
+    }
+
+    function t(key, params) {
+      const value = langPack()[key] ?? I18N.pl[key] ?? key;
+      return typeof value === "function" ? value(params || {}) : value;
+    }
+
+    function locale() {
+      return langPack().locale || "pl-PL";
+    }
+
     function formatInt(value) {
-      return Math.round(value).toLocaleString("pl-PL");
+      return Math.round(value).toLocaleString(locale());
     }
 
     function formatDecimal(value, digits = 2) {
-      return Number(value).toLocaleString("pl-PL", {
+      return Number(value).toLocaleString(locale(), {
         minimumFractionDigits: digits,
         maximumFractionDigits: digits
       });
@@ -1358,6 +1706,8 @@
 
     function formatTrailerCount(count) {
       const value = Math.max(0, Math.round(count));
+      if (currentLang() === "en") return `${formatInt(value)} ${value === 1 ? "trailer" : "trailers"}`;
+      if (currentLang() === "nl") return `${formatInt(value)} ${value === 1 ? "oplegger" : "opleggers"}`;
       if (value === 1) return "1 naczepa";
       const mod10 = value % 10;
       const mod100 = value % 100;
@@ -1367,6 +1717,8 @@
 
     function formatPalletCount(count) {
       const value = Math.max(0, Math.round(count));
+      if (currentLang() === "en") return `${formatInt(value)} ${value === 1 ? "pallet" : "pallets"}`;
+      if (currentLang() === "nl") return `${formatInt(value)} ${value === 1 ? "pallet" : "pallets"}`;
       if (value === 1) return "1 paletę";
       const mod10 = value % 10;
       const mod100 = value % 100;
@@ -1427,6 +1779,100 @@
         .replaceAll("'", "&#039;");
     }
 
+    function setText(selector, value) {
+      const node = document.querySelector(selector);
+      if (node) node.textContent = value;
+    }
+
+    function trailerPresetLabel(preset) {
+      if (preset.key === "custom") return t("customTrailer");
+      if (preset.key === "std-136-240") {
+        if (currentLang() === "en") return "Industry standard - 13600 x 2400";
+        if (currentLang() === "nl") return "Branchenorm - 13600 x 2400";
+      }
+      return preset.label;
+    }
+
+    function palletPresetLabel(preset) {
+      if (preset.key === "custom") return t("customPallet");
+      return preset.label;
+    }
+
+    function qualityLabel(value) {
+      return value === "fast" ? t("fast") : t("optimal");
+    }
+
+    function planLabel(value) {
+      const text = String(value || "none");
+      const labels = langPack().planLabels || {};
+      if (labels[text]) return labels[text];
+      const parts = text.split(" + ");
+      if (parts.length > 1) return parts.map((part) => planLabel(part)).join(" + ");
+      return text.replaceAll("mieszana", labels.mieszana || "mieszana");
+    }
+
+    function applyTranslations() {
+      document.documentElement.lang = currentLang();
+      document.title = t("documentTitle");
+      if (el.language) {
+        el.language.value = currentLang();
+        el.language.setAttribute("aria-label", t("languageAria"));
+      }
+      setText(".brand h1", t("appTitle"));
+      setText(".brand p", t("appSubtitle"));
+      el.resetDemo.textContent = t("clearList");
+      el.print.textContent = t("print");
+      setText(".summary-main strong", t("trailer"));
+      setText('label[for="trailerPreset"]', t("preset"));
+      setText('label[for="trailerLength"]', t("length"));
+      setText('label[for="trailerWidth"]', t("width"));
+      setText(".section:nth-of-type(1) .section-title h2", t("settings"));
+      setText('label[for="gapInput"]', t("gap"));
+      setText('label[for="searchQuality"]', t("calcMode"));
+      const fastOption = el.searchQuality.querySelector('option[value="fast"]');
+      const deepOption = el.searchQuality.querySelector('option[value="deep"]');
+      if (fastOption) fastOption.textContent = t("fast");
+      if (deepOption) deepOption.textContent = t("optimal");
+      setText('label[for="rotateInput"] span', t("rotate"));
+      setText('label[for="compactInput"] span', t("compact"));
+      setText(".sidebar section:nth-of-type(2) .section-title h2", t("pallets"));
+      setText('label[for="newPalletPreset"]', t("size"));
+      setText('label[for="newPalletQty"]', t("quantity"));
+      el.addLoad.textContent = t("add");
+      setText('label[for="customPalletLength"]', t("length"));
+      setText('label[for="customPalletWidth"]', t("width"));
+      setText('label[for="customPalletName"]', t("name"));
+      const defaultCustomNames = Object.values(I18N).map((pack) => pack.customName);
+      if (defaultCustomNames.includes(el.customPalletName.value)) {
+        el.customPalletName.value = t("customName");
+      }
+      const table = document.querySelector("table");
+      if (table) table.setAttribute("aria-label", t("pallets"));
+      const headers = document.querySelectorAll("thead th");
+      if (headers[0]) headers[0].textContent = t("pallet");
+      if (headers[1]) headers[1].textContent = t("quantity");
+      el.emptyLoads.textContent = t("emptyLoads");
+      el.recalc.textContent = t("recalc");
+      setText(".sidebar section:nth-of-type(3) .section-title h2", t("assumptions"));
+      const sourceList = document.querySelector(".source-list");
+      if (sourceList) sourceList.innerHTML = t("sourceHtml");
+      const metricLabels = document.querySelectorAll(".metric-label");
+      [t("placed"), t("fill"), t("ldmTotal"), t("trailers"), t("missing")].forEach((text, index) => {
+        if (metricLabels[index]) metricLabels[index].textContent = text;
+      });
+      setText(".stage-title h2", t("topView"));
+      if (!currentPlan) el.planSubtitle.textContent = t("noData");
+      el.alternate.textContent = t("alternate");
+      el.canvas.setAttribute("aria-label", t("deckAria"));
+      if (!isCalculating && el.calcOverlayText) el.calcOverlayText.textContent = t("calculating");
+      if (!isCalculating && el.calcProgressMeta) el.calcProgressMeta.textContent = t("calcStart");
+      const resultHeadings = document.querySelectorAll(".result-box h3");
+      if (resultHeadings[0]) resultHeadings[0].textContent = t("legend");
+      if (resultHeadings[1]) resultHeadings[1].textContent = t("messages");
+      setText(".footnote", t("footnote"));
+      if (!isCalculating) updateStatus("good", t("ready"));
+    }
+
     function createRow(presetKey = "epal1", quantity = 1) {
       const preset = PALLET_PRESETS.find((item) => item.key === presetKey) || PALLET_PRESETS[0];
       return {
@@ -1441,6 +1887,7 @@
     }
 
     function defaultState() {
+      const language = currentLang();
       state.trailerPreset = "krone-profi";
       state.trailerLength = 13620;
       state.trailerWidth = 2480;
@@ -1448,6 +1895,7 @@
       state.allowRotate = true;
       state.compactLength = true;
       state.searchQuality = "deep";
+      state.language = language;
       state.layoutVariant = 0;
       state.rows = [];
       state.nextRowId = 1;
@@ -1470,6 +1918,7 @@
         state.allowRotate = Boolean(saved.allowRotate);
         state.compactLength = saved.compactLength !== false;
         state.searchQuality = saved.searchQuality === "fast" ? "fast" : "deep";
+        state.language = I18N[saved.language] ? saved.language : "pl";
         state.layoutVariant = Math.floor(clampNumber(saved.layoutVariant, 0, 0));
         state.rows = saved.rows.map((row) => ({
           id: Number.isFinite(Number(row.id)) ? Number(row.id) : state.nextRowId++,
@@ -1496,6 +1945,7 @@
         compactLength: state.compactLength,
         gapDefaultVersion: GAP_DEFAULT_VERSION,
         searchQuality: state.searchQuality,
+        language: currentLang(),
         layoutVariant: state.layoutVariant,
         rows: state.rows
       };
@@ -1503,15 +1953,17 @@
     }
 
     function renderSelectOptions() {
+      const selectedTrailer = el.trailerPreset.value || state.trailerPreset;
+      const selectedPallet = el.newPalletPreset.value || "size-115-170";
       el.trailerPreset.innerHTML = TRAILER_PRESETS
-        .map((preset) => `<option value="${preset.key}">${escapeHtml(preset.label)}</option>`)
+        .map((preset) => `<option value="${preset.key}" ${preset.key === selectedTrailer ? "selected" : ""}>${escapeHtml(trailerPresetLabel(preset))}</option>`)
         .join("");
-      el.newPalletPreset.innerHTML = palletSelectHtml("size-115-170");
+      el.newPalletPreset.innerHTML = palletSelectHtml(selectedPallet);
     }
 
     function palletSelectHtml(selectedKey) {
       return PALLET_PRESETS
-        .map((preset) => `<option value="${preset.key}" ${preset.key === selectedKey ? "selected" : ""}>${escapeHtml(preset.label)}</option>`)
+        .map((preset) => `<option value="${preset.key}" ${preset.key === selectedKey ? "selected" : ""}>${escapeHtml(palletPresetLabel(preset))}</option>`)
         .join("");
     }
 
@@ -1528,14 +1980,15 @@
       el.gap.value = state.gap;
       el.rotate.checked = state.allowRotate;
       el.compact.checked = state.compactLength;
+      if (el.language) el.language.value = currentLang();
       el.searchQuality.value = state.searchQuality;
       el.emptyLoads.classList.toggle("visible", state.rows.length === 0);
       const totalQuantity = state.rows.reduce((sum, row) => sum + Math.floor(clampNumber(row.quantity, 0, 0)), 0);
-      el.loadsCount.textContent = `Dodano ${formatPalletCount(totalQuantity)}`;
+      el.loadsCount.textContent = t("added", formatPalletCount(totalQuantity));
 
       el.loadsBody.innerHTML = state.rows.map((row) => `
         <tr data-row-id="${row.id}">
-          <td class="load-main" data-label="Paleta">
+          <td class="load-main" data-label="${escapeHtml(t("pallet"))}">
             <div class="load-summary">
               <span class="swatch" style="background:${escapeHtml(row.color)}"></span>
               <span class="load-text">
@@ -1544,12 +1997,12 @@
               </span>
             </div>
           </td>
-          <td data-label="Ilość">
-            <input class="qty-input" data-field="quantity" type="number" min="1" step="1" inputmode="numeric" value="${row.quantity}" aria-label="Ilość palet ${escapeHtml(row.name)}">
+          <td data-label="${escapeHtml(t("quantity"))}">
+            <input class="qty-input" data-field="quantity" type="number" min="1" step="1" inputmode="numeric" value="${row.quantity}" aria-label="${escapeHtml(t("qtyAria", row.name))}">
           </td>
-          <td class="actions" data-label="Akcje">
+          <td class="actions" data-label="${escapeHtml(t("actions"))}">
             <div class="row-actions">
-              <button class="icon danger" type="button" data-action="delete" aria-label="Usuń ${escapeHtml(row.name)}" title="Usuń">×</button>
+              <button class="icon danger" type="button" data-action="delete" aria-label="${escapeHtml(t("deleteAria", row.name))}" title="${escapeHtml(t("delete"))}">×</button>
             </div>
           </td>
         </tr>
@@ -1575,7 +2028,7 @@
 
       const length = clampNumber(el.customPalletLength.value, 1, 1000);
       const width = clampNumber(el.customPalletWidth.value, 1, 900);
-      const name = (el.customPalletName.value || "Własna").trim().slice(0, 60) || "Własna";
+      const name = (el.customPalletName.value || t("customName")).trim().slice(0, 60) || t("customName");
       return {
         id: state.nextRowId++,
         presetKey: "custom",
@@ -1640,8 +2093,11 @@
       const remaining = Math.max(0, budget - elapsed);
       if (el.calcProgressBar) el.calcProgressBar.style.width = `${percent.toFixed(1)}%`;
       if (el.calcProgressMeta) {
-        el.calcProgressMeta.textContent =
-          `${Math.round(percent)}% czasu, minęło ${formatDurationMs(elapsed)}, zostało maks. ${formatDurationMs(remaining)}`;
+        el.calcProgressMeta.textContent = t("progressMeta", {
+          percent: Math.round(percent),
+          elapsed: formatDurationMs(elapsed),
+          remaining: formatDurationMs(remaining)
+        });
       }
     }
 
@@ -1655,7 +2111,7 @@
       if (el.calcProgressMeta) el.calcProgressMeta.textContent = "";
     }
 
-    function setCalculating(active, text = "Liczenie układu...", options = {}) {
+    function setCalculating(active, text = t("calculating"), options = {}) {
       isCalculating = active;
       document.body.classList.toggle("is-calculating", active);
       el.recalc.disabled = active;
@@ -4130,16 +4586,16 @@
     function buildIssues(plan, items, trailer) {
       const issues = [];
       if (items.length === 0) {
-        issues.push({ kind: "info", text: "Dodaj co najmniej jedną paletę z ilością większą od zera." });
+        issues.push({ kind: "info", text: t("addAtLeastOne") });
       }
       if (plan.unplaced.length > 0) {
         const grouped = groupByName(plan.unplaced);
         for (const item of grouped) {
-          issues.push({ kind: "bad", text: `Nie zmieszczono: ${item.name} - ${item.count} szt.` });
+          issues.push({ kind: "bad", text: t("unplacedItem", { name: item.name, count: item.count }) });
         }
       }
       if (plan.trailerCount > 1) {
-        issues.push({ kind: "info", text: `Ładunek rozłożono na ${formatTrailerCount(plan.trailerCount)}.` });
+        issues.push({ kind: "info", text: t("loadSplit", formatTrailerCount(plan.trailerCount)) });
       }
       for (const row of state.rows) {
         const length = clampNumber(row.length, 1, 1) + state.gap;
@@ -4147,16 +4603,20 @@
         const normalFits = length <= trailer.length && width <= trailer.width;
         const rotatedFits = state.allowRotate && width <= trailer.length && length <= trailer.width;
         if (row.quantity > 0 && !normalFits && !rotatedFits) {
-          issues.push({ kind: "bad", text: `${row.name || "Paleta"} jest większa niż dostępny footprint naczepy.` });
+          issues.push({ kind: "bad", text: t("tooLarge", row.name || t("pallet")) });
         }
       }
       if (issues.length === 0) {
         if (String(plan.method || "").startsWith("WASM CP-SAT")) {
-          const statusText = plan.status === "OPTIMAL" ? "optymalność potwierdzona" : "najlepszy znaleziony wynik w limicie czasu, bez dowodu optimum";
-          issues.push({ kind: "info", text: `Plan policzony silnikiem OR-Tools CP-SAT WebAssembly: ${statusText}. Model: ${formatInt(plan.variantCount || 0)} zmiennych, ${formatInt(plan.candidateCount || 0)} ograniczeń.` });
+          const statusText = plan.status === "OPTIMAL" ? t("cpsatStatusOptimal") : t("cpsatStatusFeasible");
+          issues.push({ kind: "info", text: t("cpsatInfo", {
+            status: statusText,
+            variables: formatInt(plan.variantCount || 0),
+            constraints: formatInt(plan.candidateCount || 0)
+          }) });
         } else {
           const testedLayouts = Math.max(plan.candidateCount || 0, plan.variantCount || 0, packVariantCount(plan.searchQuality));
-          issues.push({ kind: "info", text: `Plan wybrany z ${formatInt(testedLayouts)} kandydatów heurystyki, w tym z mieszania rozmiarów, MaxRects i dosuwania skyline.` });
+          issues.push({ kind: "info", text: t("heuristicInfo", formatInt(testedLayouts)) });
         }
       }
       return issues;
@@ -4196,8 +4656,8 @@
       const token = ++calculationToken;
       const quality = options.auto ? "fast" : state.searchQuality;
       const config = searchQualityConfig(quality);
-      const qualityForStatus = options.auto ? "szybkie" : config.label.toLowerCase();
-      setCalculating(true, `Liczenie układu (${qualityForStatus})...`, { budgetMs: config.budgetMs, reset: true });
+      const qualityForStatus = options.auto ? t("quickCalc") : qualityLabel(quality).toLowerCase();
+      setCalculating(true, `${t("calculating")} (${qualityForStatus})`, { budgetMs: config.budgetMs, reset: true });
       await yieldToBrowser();
 
       try {
@@ -4271,16 +4731,23 @@
 
       const trailerLabel = `${formatInt(plan.trailer.length)} x ${formatInt(plan.trailer.width)} mm`;
       const trailerText = formatTrailerCount(plan.trailerCount);
-      const variantText = plan.layoutVariant > 0 ? `, wariant: ${formatInt(plan.layoutVariant + 1)}` : "";
-      const qualityText = plan.autoSearch ? "szybkie" : searchQualityConfig(plan.searchQuality).label.toLowerCase();
-      el.planSubtitle.textContent = `${trailerText}, ${trailerLabel}, strategia: ${plan.strategyLabel}, metoda: ${plan.method}${variantText}, liczenie: ${qualityText}.`;
-      updateStatus(missing === 0 ? "good" : "warn", missing === 0 ? "Wszystko ułożone" : "Są nieułożone palety");
+      const variantText = plan.layoutVariant > 0 ? `, ${t("variant")}: ${formatInt(plan.layoutVariant + 1)}` : "";
+      const qualityText = plan.autoSearch ? t("quickCalc") : qualityLabel(plan.searchQuality).toLowerCase();
+      el.planSubtitle.textContent = t("planSubtitle", {
+        trailerText,
+        trailerLabel,
+        strategy: planLabel(plan.strategyLabel),
+        method: planLabel(plan.method),
+        variantText,
+        quality: qualityText
+      });
+      updateStatus(missing === 0 ? "good" : "warn", missing === 0 ? t("allPlaced") : t("hasUnplaced"));
     }
 
     function renderLegend(plan) {
       const summary = summarizeByType(plan);
       if (summary.length === 0) {
-        el.legendList.innerHTML = `<li class="empty-state">Brak palet w planie.</li>`;
+        el.legendList.innerHTML = `<li class="empty-state">${escapeHtml(t("noPalletsInPlan"))}</li>`;
         return;
       }
       el.legendList.innerHTML = summary.map((item) => `
@@ -4408,10 +4875,10 @@
       ctx.fillStyle = "#334155";
       ctx.font = "700 12px Segoe UI, Arial, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(totalTrailers > 1 ? `Naczepa ${layout.index}` : "Naczepa", ox + deckW / 2, oy - 16);
+      ctx.fillText(totalTrailers > 1 ? `${t("trailer")} ${layout.index}` : t("trailer"), ox + deckW / 2, oy - 16);
       ctx.fillStyle = "#64748b";
       ctx.font = "11px Segoe UI, Arial, sans-serif";
-      ctx.fillText("ciągnik u góry", ox + deckW / 2, oy - 3);
+      ctx.fillText(t("tractorTop"), ox + deckW / 2, oy - 3);
       ctx.restore();
     }
 
@@ -4489,10 +4956,10 @@
       const pallet = hit.pallet;
       el.tooltip.innerHTML = `
         <strong>${escapeHtml(pallet.name)} #${pallet.itemIndex}</strong>
-        Naczepa: ${formatInt(pallet.trailerIndex || 1)}<br>
-        Pozycja: ${formatInt(pallet.x)} / ${formatInt(pallet.y)} mm<br>
-        Wymiar: ${formatInt(pallet.length)} x ${formatInt(pallet.width)} mm<br>
-        Orientacja: ${pallet.rotated ? "obrócona" : "bazowa"}
+        ${escapeHtml(t("trailerLabel"))}: ${formatInt(pallet.trailerIndex || 1)}<br>
+        ${escapeHtml(t("position"))}: ${formatInt(pallet.x)} / ${formatInt(pallet.y)} mm<br>
+        ${escapeHtml(t("dimension"))}: ${formatInt(pallet.length)} x ${formatInt(pallet.width)} mm<br>
+        ${escapeHtml(t("orientation"))}: ${escapeHtml(pallet.rotated ? t("rotated") : t("base"))}
       `;
       const shellRect = el.canvasShell.getBoundingClientRect();
       const left = Math.min(hit.px + 14, shellRect.width - 270);
@@ -4595,6 +5062,24 @@
         addPalletFromForm();
       });
 
+      if (el.language) {
+        el.language.addEventListener("change", () => {
+          state.language = I18N[el.language.value] ? el.language.value : "pl";
+          renderSelectOptions();
+          applyTranslations();
+          renderControls();
+          updateCustomAddVisibility();
+          if (currentPlan) {
+            updateMetrics(currentPlan);
+            renderLegend(currentPlan);
+            const items = expandItems(state.rows, currentPlan.gap || state.gap);
+            renderIssues(buildIssues(currentPlan, items, currentPlan.trailer));
+            drawDeck(currentPlan);
+          }
+          saveState();
+        });
+      }
+
       el.newPalletPreset.addEventListener("change", updateCustomAddVisibility);
       for (const input of [el.newPalletQty, el.customPalletLength, el.customPalletWidth, el.customPalletName]) {
         input.addEventListener("keydown", (event) => {
@@ -4635,8 +5120,9 @@
     }
 
     function init() {
-      renderSelectOptions();
       loadState();
+      renderSelectOptions();
+      applyTranslations();
       renderControls();
       updateCustomAddVisibility();
       bindEvents();
