@@ -101,6 +101,20 @@
       border-color: #fecaca;
     }
 
+    button.stop-button {
+      min-width: 72px;
+      background: #fff5f5;
+      color: var(--red);
+      border-color: #fecaca;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    button.stop-button:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+
     button.icon {
       width: 36px;
       padding: 0;
@@ -1029,7 +1043,7 @@
 
       .calc-controls {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         width: 100%;
       }
 
@@ -1150,6 +1164,7 @@
               </select>
             </label>
             <button id="recalcBtn" class="primary" type="button">Przelicz</button>
+            <button id="stopCalcBtn" class="danger stop-button" type="button" hidden>STOP</button>
           </div>
         </div>
       </section>
@@ -1229,7 +1244,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-04.17";
+    const APP_VERSION = "2026-06-04.18";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1268,6 +1283,8 @@
         emptyLoads: "Brak palet do ułożenia.",
         recalc: "Przelicz",
         recalcAgain: "Przelicz ponownie",
+        stop: "STOP",
+        stopped: "Zatrzymano",
         placed: "Ułożono",
         fill: "Wypełnienie",
         ldmTotal: "LDM razem",
@@ -1375,6 +1392,8 @@
         emptyLoads: "No pallets to arrange.",
         recalc: "Calculate",
         recalcAgain: "Calculate again",
+        stop: "STOP",
+        stopped: "Stopped",
         placed: "Placed",
         fill: "Fill",
         ldmTotal: "Total LDM",
@@ -1482,6 +1501,8 @@
         emptyLoads: "Geen pallets om te plaatsen.",
         recalc: "Berekenen",
         recalcAgain: "Opnieuw berekenen",
+        stop: "STOP",
+        stopped: "Gestopt",
         placed: "Geplaatst",
         fill: "Vulling",
         ldmTotal: "LDM totaal",
@@ -1673,6 +1694,7 @@
       language: document.getElementById("languageSelect"),
       resetDemo: document.getElementById("resetDemoBtn"),
       recalc: document.getElementById("recalcBtn"),
+      stop: document.getElementById("stopCalcBtn"),
       csv: document.getElementById("csvBtn"),
       print: document.getElementById("printBtn"),
       canvas: document.getElementById("deckCanvas"),
@@ -1701,6 +1723,9 @@
     let hasCalculated = false;
     let calculationToken = 0;
     let activeSolverWorker = null;
+    let activeSolverReject = null;
+    let activePreviewWorker = null;
+    let activePreviewReject = null;
     let calculationProgressTimer = null;
     let calculationProgress = null;
     let calculationPreviewTimer = null;
@@ -1934,6 +1959,7 @@
       if (headers[1]) headers[1].textContent = t("quantity");
       el.emptyLoads.textContent = t("emptyLoads");
       updateRecalcLabel();
+      el.stop.textContent = t("stop");
       const metricLabels = document.querySelectorAll(".metric-label");
       [t("placed"), t("fill"), t("ldmTotal"), t("trailers"), t("missing")].forEach((text, index) => {
         if (metricLabels[index]) metricLabels[index].textContent = text;
@@ -2190,10 +2216,32 @@
       if (el.calcProgressMeta) el.calcProgressMeta.textContent = "";
     }
 
+    function createAbortError(message = "Calculation stopped") {
+      const error = new Error(message);
+      error.name = "AbortError";
+      return error;
+    }
+
+    function isAbortError(error) {
+      return error && error.name === "AbortError";
+    }
+
+    function abortActiveSolver(message = "Calculation stopped") {
+      const reject = activeSolverReject;
+      if (activeSolverWorker) {
+        activeSolverWorker.terminate();
+        activeSolverWorker = null;
+      }
+      activeSolverReject = null;
+      if (reject) reject(createAbortError(message));
+    }
+
     function setCalculating(active, text = t("calculating"), options = {}) {
       isCalculating = active;
       document.body.classList.toggle("is-calculating", active);
       el.recalc.disabled = active;
+      el.stop.hidden = !active;
+      el.stop.disabled = !active;
       if (el.calcOverlayText) el.calcOverlayText.textContent = text;
       if (active) {
         const budgetMs = Math.max(1, Number(options.budgetMs || calculationProgress?.budgetMs || 1000));
@@ -2212,12 +2260,81 @@
       }
     }
 
+    function cancelCalculation() {
+      if (!isCalculating) return;
+      calculationToken++;
+      abortActiveSolver("Calculation stopped by user");
+      stopCalculationPreview();
+      setCalculating(false);
+      updateStatus("warn", t("stopped"));
+    }
+
     function stopCalculationPreview() {
       if (calculationPreviewTimer) {
         clearInterval(calculationPreviewTimer);
         calculationPreviewTimer = null;
       }
+      const reject = activePreviewReject;
+      if (activePreviewWorker) {
+        activePreviewWorker.terminate();
+        activePreviewWorker = null;
+      }
+      activePreviewReject = null;
+      if (reject) reject(createAbortError("Preview stopped"));
       calculationPreviewRunning = false;
+    }
+
+    function estimatePreviewTrailerCount(preview, items, trailer) {
+      const trailerArea = Math.max(1, trailer.length * trailer.width);
+      const totalPackArea = items.reduce((sum, item) => sum + (item.packLength || item.length) * (item.packWidth || item.width), 0);
+      const areaEstimate = Math.ceil(totalPackArea / (trailerArea * 0.86));
+      const placedPerTrailer = preview.trailerCount > 0 ? preview.placed.length / preview.trailerCount : 0;
+      const paceEstimate = placedPerTrailer > 0 ? Math.ceil(items.length / placedPerTrailer) : 1;
+      return Math.max(1, areaEstimate, paceEstimate, currentPlan?.trailerCount || 0, displayedPlan?.trailerCount || 0);
+    }
+
+    function solvePreviewWithWorker(payload, token) {
+      return new Promise((resolve, reject) => {
+        if (activePreviewWorker) {
+          activePreviewWorker.terminate();
+          activePreviewWorker = null;
+        }
+        if (activePreviewReject) {
+          const rejectPrevious = activePreviewReject;
+          activePreviewReject = null;
+          rejectPrevious(createAbortError("Preview replaced"));
+        }
+
+        const worker = createSolverWorker();
+        activePreviewWorker = worker;
+        activePreviewReject = reject;
+        const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+        worker.onmessage = (event) => {
+          const data = event.data || {};
+          if (data.requestId !== requestId) return;
+          if (data.type === "progress") return;
+          worker.terminate();
+          if (activePreviewWorker === worker) activePreviewWorker = null;
+          if (activePreviewReject === reject) activePreviewReject = null;
+          if (token !== calculationToken) {
+            reject(createAbortError("Preview expired"));
+          } else if (data.type === "result") {
+            resolve(data.plan);
+          } else {
+            reject(new Error(data.message || "Preview worker error"));
+          }
+        };
+
+        worker.onerror = (event) => {
+          worker.terminate();
+          if (activePreviewWorker === worker) activePreviewWorker = null;
+          if (activePreviewReject === reject) activePreviewReject = null;
+          reject(new Error(event.message || "Preview worker error"));
+        };
+
+        worker.postMessage({ requestId, payload });
+      });
     }
 
     function startCalculationPreview({ token, items, trailer, seed }) {
@@ -2228,16 +2345,28 @@
         calculationPreviewRunning = true;
         try {
           const startedAt = nowMs();
-          const preview = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
+          const preview = await solvePreviewWithWorker({
+            rows: state.rows,
+            trailer,
+            gap: state.gap,
+            allowRotate: state.allowRotate,
+            compactLength: state.compactLength,
             searchQuality: "fast",
             layoutVariant: state.layoutVariant + previewVariant,
             inputSeed: mixSeed(seed, previewVariant + 1, 5021),
-            deadline: startedAt + 900
-          });
+            budgetMs: 4500,
+            maxTimeSeconds: 5
+          }, token);
           previewVariant++;
           if (token !== calculationToken || !isCalculating || !preview || !preview.placed?.length) return;
+          const estimatedTrailerCount = estimatePreviewTrailerCount(preview, items, trailer);
+          const isIncompleteSingleTrailerPreview = preview.unplaced?.length > 0 && preview.trailerCount < estimatedTrailerCount;
+          if (isIncompleteSingleTrailerPreview && (displayedPlan?.trailerCount || currentPlan?.trailerCount || 0) >= estimatedTrailerCount) {
+            return;
+          }
           const previewPlan = {
             ...preview,
+            trailerCount: isIncompleteSingleTrailerPreview ? estimatedTrailerCount : preview.trailerCount,
             trailer,
             totalItems: items.length,
             gap: state.gap,
@@ -2249,6 +2378,7 @@
           renderIssues(buildIssues(previewPlan, items, trailer));
           drawDeck(previewPlan);
         } catch (error) {
+          if (isAbortError(error)) return;
           console.warn("Preview layout unavailable.", error);
         } finally {
           calculationPreviewRunning = false;
@@ -3186,7 +3316,8 @@
           const startedAt = nowMs();
           const quality = payload.searchQuality === "fast" ? "fast" : "deep";
           const config = SEARCH_QUALITY[quality] || SEARCH_QUALITY.deep;
-          const deadline = startedAt + config.budgetMs;
+          const budgetMs = clampNumber(payload.budgetMs, 1, config.budgetMs);
+          const deadline = startedAt + budgetMs;
           const trailer = payload.trailer;
           const items = expandItems(payload.rows || [], payload.gap || 0);
           const placed = [];
@@ -3262,13 +3393,11 @@
 
     function solveWithWorker(payload, token) {
       return new Promise((resolve, reject) => {
-        if (activeSolverWorker) {
-          activeSolverWorker.terminate();
-          activeSolverWorker = null;
-        }
+        abortActiveSolver("Solver replaced");
 
         const worker = createSolverWorker();
         activeSolverWorker = worker;
+        activeSolverReject = reject;
         const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
         worker.onmessage = (event) => {
@@ -3284,6 +3413,7 @@
           }
           worker.terminate();
           if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (activeSolverReject === reject) activeSolverReject = null;
           if (data.type === "result") {
             resolve(data.plan);
           } else {
@@ -3294,6 +3424,7 @@
         worker.onerror = (event) => {
           worker.terminate();
           if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (activeSolverReject === reject) activeSolverReject = null;
           reject(new Error(event.message || "Solver worker error"));
         };
 
@@ -3307,13 +3438,11 @@
 
     function solveWithCpSatWorker(payload, token) {
       return new Promise((resolve, reject) => {
-        if (activeSolverWorker) {
-          activeSolverWorker.terminate();
-          activeSolverWorker = null;
-        }
+        abortActiveSolver("Solver replaced");
 
         const worker = createCpSatWorker();
         activeSolverWorker = worker;
+        activeSolverReject = reject;
         const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
         worker.onmessage = (event) => {
@@ -3329,6 +3458,7 @@
           }
           worker.terminate();
           if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (activeSolverReject === reject) activeSolverReject = null;
           if (data.type === "result") {
             resolve(data.plan);
           } else {
@@ -3339,6 +3469,7 @@
         worker.onerror = (event) => {
           worker.terminate();
           if (activeSolverWorker === worker) activeSolverWorker = null;
+          if (activeSolverReject === reject) activeSolverReject = null;
           reject(new Error(event.message || "OR-Tools CP-SAT worker error"));
         };
 
@@ -4821,6 +4952,7 @@
             ? await solveWithCpSatWorker(solverPayload, token)
             : await solveWithWorker(solverPayload, token);
         } catch (error) {
+          if (isAbortError(error) || token !== calculationToken) return currentPlan;
           console.warn("Primary solver unavailable, using fallback.", error);
           plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
             searchQuality: quality,
@@ -5276,6 +5408,8 @@
         }
         calculateAndRender();
       });
+
+      el.stop.addEventListener("click", cancelCalculation);
 
       el.csv.addEventListener("click", () => exportCsv());
       el.print.addEventListener("click", () => window.print());
