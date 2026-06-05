@@ -8,7 +8,7 @@ import {
 import { toLinearExpr } from "./vendor/cpsat-js/dist/model/linear-expr.js";
 
 let cachedSolver = null;
-const CP_SAT_GRID_MM = 10;
+const CP_SAT_GRID_MM = 5;
 
 self.onmessage = async (event) => {
   const { requestId, payload } = event.data || {};
@@ -1272,7 +1272,7 @@ function solveCpSatLayout(solver, payload, requestId) {
       trailer,
       trailerIndex,
       strategyLabel,
-      "WASM CP-SAT NoOverlap2D cm-grid + dynamic rows/max-rects"
+      "WASM CP-SAT NoOverlap2D 5mm-grid + dynamic rows/max-rects"
     );
     trailers.push(trailerSummary);
     placed.push(...trailerSummary.placed);
@@ -1300,9 +1300,9 @@ function solveCpSatLayout(solver, payload, requestId) {
     fill: trailerCount > 0 ? placedArea / (trailerArea * trailerCount) : 0,
     freeArea: Math.max(0, trailerArea * trailerCount - placedArea),
     strategyLabel: result.status === CpSolverStatus.OPTIMAL
-      ? "OR-Tools CP-SAT exact + cm-grid repack"
-      : "OR-Tools CP-SAT feasible + cm-grid repack",
-    method: "WASM CP-SAT NoOverlap2D cm-grid + dynamic rows/max-rects",
+      ? "OR-Tools CP-SAT exact + 5mm-grid repack"
+      : "OR-Tools CP-SAT feasible + 5mm-grid repack",
+    method: "WASM CP-SAT NoOverlap2D 5mm-grid + dynamic rows/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
     layoutVariant,

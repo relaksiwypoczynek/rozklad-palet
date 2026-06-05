@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.3</title>
+  <title>LoadPallet v1.4</title>
   <style>
     :root {
       color-scheme: light;
@@ -1098,7 +1098,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.3</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.4</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1288,14 +1288,14 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.11";
-    const APP_DISPLAY_VERSION = "v1.3";
+    const APP_VERSION = "2026-06-05.12";
+    const APP_DISPLAY_VERSION = "v1.4";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
     const SEARCH_QUALITY = {
       fast: { label: "Szybki", randomRuns: 4, budgetMs: 900, beamScale: 0.62, branchScale: 0.68 },
-      deep: { label: "Optymalny", randomRuns: 180, budgetMs: 180000, beamScale: 1.85, branchScale: 1.72 }
+      deep: { label: "Optymalny", randomRuns: 180, budgetMs: 120000, beamScale: 1.85, branchScale: 1.72 }
     };
 
     const I18N = {
@@ -2527,7 +2527,7 @@
       const source = `
         const SEARCH_QUALITY = {
           fast: { label: "Szybki", budgetMs: 900, beamWidth: 120, branchLimit: 36, patternLimit: 360 },
-          deep: { label: "Optymalny", budgetMs: 180000, beamWidth: 2600, branchLimit: 360, patternLimit: 7200 }
+          deep: { label: "Optymalny", budgetMs: 120000, beamWidth: 2600, branchLimit: 360, patternLimit: 7200 }
         };
 
         self.onmessage = (event) => {
@@ -5426,6 +5426,7 @@
                 best: planProgressSummary(plan)
               });
               setCalculationMessage(message, "good");
+              break;
             } else {
               plan = selectedPlan || bestKnownPlan(candidate) || candidate;
               if (pendingCalculation && pendingCalculation.token === token) {
