@@ -322,6 +322,80 @@ function greedyWarmStart(items, trailer, allowRotate) {
   };
 }
 
+function warmStartFromPlan(items, plan, trailer, allowRotate) {
+  if (!plan || !Array.isArray(plan.placed) || plan.placed.length !== items.length) return null;
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const bins = [];
+  const placements = new Map();
+
+  for (const placed of plan.placed) {
+    const item = itemById.get(placed.id);
+    if (!item || placements.has(item.id)) return null;
+    const orientations = getOrientations(item, trailer, allowRotate);
+    const orientation = orientations.find((orient) =>
+      Boolean(orient.rotated) === Boolean(placed.rotated) &&
+      Math.abs(orient.packLength - placed.packLength) <= 2 &&
+      Math.abs(orient.packWidth - placed.packWidth) <= 2
+    ) || orientations.find((orient) =>
+      Math.abs(orient.packLength - placed.packLength) <= 2 &&
+      Math.abs(orient.packWidth - placed.packWidth) <= 2
+    );
+    if (!orientation) return null;
+
+    const x = Math.round(placed.x);
+    const y = Math.round(placed.y);
+    if (x < 0 || y < 0 || x + orientation.packLength > trailer.length || y + orientation.packWidth > trailer.width) {
+      return null;
+    }
+
+    const binIndex = Math.max(0, Math.floor((placed.trailerIndex || 1) - 1));
+    if (!bins[binIndex]) bins[binIndex] = { placements: [] };
+    const placement = {
+      binIndex,
+      x,
+      y,
+      rotated: Boolean(orientation.rotated),
+      packLength: orientation.packLength,
+      packWidth: orientation.packWidth
+    };
+    bins[binIndex].placements.push({ item, placement });
+    placements.set(item.id, placement);
+  }
+
+  if (placements.size !== items.length) return null;
+  const denseBins = [];
+  const remap = new Map();
+  for (let i = 0; i < bins.length; i++) {
+    const bin = bins[i];
+    if (!bin || bin.placements.length === 0) continue;
+    remap.set(i, denseBins.length);
+    denseBins.push(bin);
+  }
+  for (const bin of denseBins) {
+    for (const entry of bin.placements) {
+      entry.placement.binIndex = remap.get(entry.placement.binIndex);
+    }
+    for (let i = 0; i < bin.placements.length; i++) {
+      for (let j = i + 1; j < bin.placements.length; j++) {
+        const a = bin.placements[i].placement;
+        const b = bin.placements[j].placement;
+        if (
+          rangesOverlap(a.x, a.packLength, b.x, b.packLength) &&
+          rangesOverlap(a.y, a.packWidth, b.y, b.packWidth)
+        ) {
+          return null;
+        }
+      }
+    }
+  }
+
+  return {
+    bins: denseBins,
+    placements,
+    count: denseBins.length
+  };
+}
+
 function overlapAmount(aStart, aSize, bStart, bSize) {
   return Math.max(0, Math.min(aStart + aSize, bStart + bSize) - Math.max(aStart, bStart));
 }
@@ -901,7 +975,8 @@ function solveCpSatLayout(solver, payload, requestId) {
   const items = orderItemsForVariant(expandedItems, layoutVariant, payload.inputSeed || 1);
   const totalArea = items.reduce((sum, item) => sum + item.packArea, 0);
   const lowerBound = Math.max(1, Math.ceil(totalArea / Math.max(1, trailer.length * trailer.width)));
-  const warmStart = greedyWarmStart(items, trailer, allowRotate);
+  const warmStart = warmStartFromPlan(items, payload.warmStartPlan, trailer, allowRotate) ||
+    greedyWarmStart(items, trailer, allowRotate);
   const upperBound = warmStart ? warmStart.count : greedyUpperBound(items, trailer, allowRotate);
   if (!upperBound) throw new Error("Co najmniej jedna paleta nie miesci sie na naczepie w zadnej orientacji.");
 

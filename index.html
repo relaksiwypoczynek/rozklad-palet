@@ -1276,7 +1276,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.03";
+    const APP_VERSION = "2026-06-05.04";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -2276,6 +2276,7 @@
       isCalculating = active;
       document.body.classList.toggle("is-calculating", active);
       el.recalc.disabled = active;
+      el.refresh.disabled = active;
       el.stop.hidden = !active;
       el.stop.disabled = !active;
       if (el.calcOverlayText) el.calcOverlayText.textContent = text;
@@ -4605,6 +4606,143 @@
       return sameTypeContact * (0.6 + sameTypeRatio);
     }
 
+    function planTrailerGroups(plan) {
+      if (Array.isArray(plan.trailers) && plan.trailers.length > 0) {
+        return plan.trailers.map((trailerPlan, index) => ({
+          index: trailerPlan.index || index + 1,
+          placed: (trailerPlan.placed || []).map((item) => ({
+            ...item,
+            trailerIndex: item.trailerIndex || trailerPlan.index || index + 1
+          }))
+        }));
+      }
+
+      const groups = new Map();
+      for (const item of plan.placed || []) {
+        const index = item.trailerIndex || 1;
+        if (!groups.has(index)) groups.set(index, []);
+        groups.get(index).push(item);
+      }
+      return [...groups.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([index, placed]) => ({ index, placed }));
+    }
+
+    function layoutContactScore(placed, trailer) {
+      let contact = 0;
+      for (const item of placed) {
+        if (item.x === 0) contact += item.packWidth;
+        if (item.y === 0 || item.y + item.packWidth === trailer.width) contact += item.packLength;
+      }
+      for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++) {
+          const a = placed[i];
+          const b = placed[j];
+          if (a.x + a.packLength === b.x || b.x + b.packLength === a.x) {
+            contact += overlapAmount(a.y, a.packWidth, b.y, b.packWidth);
+          }
+          if (a.y + a.packWidth === b.y || b.y + b.packWidth === a.y) {
+            contact += overlapAmount(a.x, a.packLength, b.x, b.packLength);
+          }
+        }
+      }
+      return contact;
+    }
+
+    function layoutFullBandLength(placed, trailer) {
+      if (placed.length === 0) return 0;
+      const edges = [...new Set(placed.flatMap((item) => [item.x, item.x + item.packLength]))]
+        .filter((value) => value >= 0 && value <= trailer.length)
+        .sort((a, b) => a - b);
+      let length = 0;
+      for (let i = 0; i < edges.length - 1; i++) {
+        const left = edges[i];
+        const right = edges[i + 1];
+        if (right <= left) continue;
+        const mid = (left + right) / 2;
+        const occupiedWidth = placed
+          .filter((item) => item.x <= mid && item.x + item.packLength >= mid)
+          .reduce((sum, item) => sum + item.packWidth, 0);
+        if (trailer.width - occupiedWidth <= 20) length += right - left;
+      }
+      return length;
+    }
+
+    function layoutPocketPenalty(placed, trailer) {
+      if (placed.length === 0) return 0;
+      const packUsedLength = placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+      const packArea = placed.reduce((sum, item) => sum + item.packLength * item.packWidth, 0);
+      const activeWaste = Math.max(0, packUsedLength * trailer.width - packArea);
+      let staggerWaste = 0;
+
+      for (const item of placed) {
+        const rightEdge = item.x + item.packLength;
+        let bestGap = Infinity;
+        let bestOverlap = 0;
+        for (const other of placed) {
+          if (other === item || other.x <= rightEdge) continue;
+          const overlap = overlapAmount(item.y, item.packWidth, other.y, other.packWidth);
+          if (overlap <= 0) continue;
+          const gap = other.x - rightEdge;
+          if (gap < bestGap) {
+            bestGap = gap;
+            bestOverlap = overlap;
+          }
+        }
+        if (bestGap > 20 && Number.isFinite(bestGap)) {
+          staggerWaste += bestGap * bestOverlap;
+        }
+      }
+
+      return activeWaste + staggerWaste * 0.55;
+    }
+
+    function finalPlanQualityTuple(plan, trailer) {
+      const groups = planTrailerGroups(plan);
+      const trailerCount = Math.max(plan.trailerCount || 0, groups.length);
+      let totalPackUsedLength = 0;
+      let maxPackUsedLength = 0;
+      let pocketPenalty = 0;
+      let fullBandLength = 0;
+      let contact = 0;
+
+      for (const group of groups) {
+        const placed = group.placed || [];
+        const groupPackUsedLength = placed.reduce((max, item) => Math.max(max, item.x + item.packLength), 0);
+        totalPackUsedLength += groupPackUsedLength;
+        maxPackUsedLength = Math.max(maxPackUsedLength, groupPackUsedLength);
+        pocketPenalty += layoutPocketPenalty(placed, trailer);
+        fullBandLength += layoutFullBandLength(placed, trailer);
+        contact += layoutContactScore(placed, trailer);
+      }
+
+      return [
+        (plan.unplaced || []).length,
+        -(plan.placed || []).length,
+        trailerCount,
+        totalPackUsedLength,
+        maxPackUsedLength,
+        Math.round(pocketPenalty),
+        -Math.round(fullBandLength),
+        -Math.round(contact),
+        Math.round(layoutBlockinessPenalty(plan.placed || []))
+      ];
+    }
+
+    function isPlanQualityBetter(candidate, current, trailer) {
+      if (!candidate) return false;
+      if (!current) return true;
+      return compareScore(finalPlanQualityTuple(candidate, trailer), finalPlanQualityTuple(current, trailer)) < 0;
+    }
+
+    function chooseBestFinalPlan(plans, trailer) {
+      let best = null;
+      for (const plan of plans) {
+        if (isPlanQualityBetter(plan, best, trailer)) best = plan;
+      }
+      return best;
+    }
+
     function scorePlan(plan, compactLength) {
       const placedCount = plan.placed.length;
       const areaScore = plan.placedArea;
@@ -4969,10 +5107,6 @@
         const startedAt = nowMs();
         const deadline = startedAt + config.budgetMs;
         const seed = inputSeed(items, trailer, state.gap, state.allowRotate);
-        let plan;
-        if (quality === "deep" && !options.auto) {
-          startCalculationPreview({ token, items, trailer, seed });
-        }
         const solverPayload = {
           rows: state.rows,
           trailer,
@@ -4984,21 +5118,88 @@
           inputSeed: seed,
           maxTimeSeconds: Math.max(1, Math.floor(config.budgetMs / 1000))
         };
+
+        let plan;
+        let baselinePlan = null;
+        const renderInterimPlan = (candidate) => {
+          if (!candidate || token !== calculationToken) return;
+          const previewPlan = {
+            ...candidate,
+            trailer,
+            totalItems: items.length,
+            gap: state.gap,
+            allowRotate: state.allowRotate,
+            searchQuality: "deep",
+            autoSearch: false
+          };
+          updateMetrics(previewPlan);
+          renderLegend(previewPlan);
+          renderIssues(buildIssues(previewPlan, items, trailer));
+          drawDeck(previewPlan);
+        };
+
+        if (quality === "deep" && !options.auto) {
+          const fastConfig = searchQualityConfig("fast");
+          try {
+            baselinePlan = await solveWithWorker({
+              ...solverPayload,
+              searchQuality: "fast",
+              budgetMs: fastConfig.budgetMs,
+              maxTimeSeconds: undefined
+            }, token);
+            if (token !== calculationToken) return currentPlan;
+            baselinePlan = {
+              ...baselinePlan,
+              searchQuality: "deep",
+              optimalSource: "fast-baseline"
+            };
+            renderInterimPlan(baselinePlan);
+          } catch (error) {
+            if (isAbortError(error) || token !== calculationToken) return currentPlan;
+            console.warn("Fast baseline unavailable.", error);
+          }
+          startCalculationPreview({ token, items, trailer, seed });
+        }
+
         try {
           plan = quality === "deep" && !options.auto
-            ? await solveWithCpSatWorker(solverPayload, token)
+            ? await solveWithCpSatWorker({
+              ...solverPayload,
+              warmStartPlan: baselinePlan
+            }, token)
             : await solveWithWorker(solverPayload, token);
         } catch (error) {
           if (isAbortError(error) || token !== calculationToken) return currentPlan;
-          console.warn("Primary solver unavailable, using fallback.", error);
-          plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
-            searchQuality: quality,
-            layoutVariant: state.layoutVariant,
-            inputSeed: seed,
-            deadline
-          });
+          if (baselinePlan) {
+            console.warn("OR-Tools CP-SAT unavailable, keeping fast baseline.", error);
+            plan = baselinePlan;
+          } else {
+            console.warn("Primary solver unavailable, using fallback.", error);
+            plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
+              searchQuality: quality,
+              layoutVariant: state.layoutVariant,
+              inputSeed: seed,
+              deadline
+            });
+          }
         }
         if (token !== calculationToken) return currentPlan;
+        if (quality === "deep" && !options.auto) {
+          const selectedPlan = chooseBestFinalPlan([baselinePlan, plan].filter(Boolean), trailer);
+          if (selectedPlan === baselinePlan && plan !== baselinePlan) {
+            plan = {
+              ...baselinePlan,
+              strategyLabel: `${baselinePlan.strategyLabel || "worker"} + kontrola jakości`,
+              optimalSource: "fast-baseline"
+            };
+          } else if (selectedPlan) {
+            plan = {
+              ...selectedPlan,
+              optimalSource: selectedPlan === baselinePlan ? "fast-baseline" : "cpsat"
+            };
+          }
+          plan.searchQuality = "deep";
+        }
         currentPlan = {
           ...plan,
           trailer,
