@@ -1276,7 +1276,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.05";
+    const APP_VERSION = "2026-06-05.06";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1376,7 +1376,7 @@
         added: (count) => `Dodano ${count}`,
         qtyAria: (name) => `Ilość palet ${name}`,
         deleteAria: (name) => `Usuń ${name}`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% czasu, minęło ${elapsed}, zostało maks. ${remaining}`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% rundy, minęło ${elapsed}, maks. ${remaining}`,
         solverTrailer: ({ index }) => `Liczenie naczepy ${formatInt(index)}`,
         calculatingCpSat: "Liczenie OR-Tools CP-SAT",
         cpsatLoading: "Ładowanie silnika OR-Tools CP-SAT",
@@ -1384,6 +1384,10 @@
         cpsatRange: ({ count, lower, upper }) =>
           `OR-Tools CP-SAT: ${formatInt(count)} palet, naczepy ${formatInt(lower)}-${formatInt(upper)}`,
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optymalizacja do ${formatInt(seconds)}s`,
+        optimalBaseReady: ({ best }) => `Wynik bazowy gotowy: ${best}. Szukam lepszego układu.`,
+        optimalRoundStart: ({ round, best }) => `CP-SAT runda ${formatInt(round)}: realny przebieg solvera. Najlepszy: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT runda ${formatInt(round)} poprawiła wynik: ${best}.`,
+        optimalRoundNoImprovement: ({ round, best }) => `CP-SAT runda ${formatInt(round)} zakończona, brak poprawy. Najlepszy nadal: ${best}.`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategia: ${strategy}, metoda: ${method}${variantText}, liczenie: ${quality}.`,
         addAtLeastOne: "Dodaj co najmniej jedną paletę z ilością większą od zera.",
@@ -1486,7 +1490,7 @@
         added: (count) => `Added ${count}`,
         qtyAria: (name) => `Pallet quantity ${name}`,
         deleteAria: (name) => `Delete ${name}`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% of time, elapsed ${elapsed}, max remaining ${remaining}`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% of round, elapsed ${elapsed}, max ${remaining}`,
         solverTrailer: ({ index }) => `Calculating trailer ${formatInt(index)}`,
         calculatingCpSat: "Calculating OR-Tools CP-SAT",
         cpsatLoading: "Loading OR-Tools CP-SAT engine",
@@ -1494,6 +1498,10 @@
         cpsatRange: ({ count, lower, upper }) =>
           `OR-Tools CP-SAT: ${formatInt(count)} pallets, trailers ${formatInt(lower)}-${formatInt(upper)}`,
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimizing for up to ${formatInt(seconds)}s`,
+        optimalBaseReady: ({ best }) => `Baseline ready: ${best}. Searching for a better layout.`,
+        optimalRoundStart: ({ round, best }) => `CP-SAT round ${formatInt(round)}: real solver pass. Best: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT round ${formatInt(round)} improved the result: ${best}.`,
+        optimalRoundNoImprovement: ({ round, best }) => `CP-SAT round ${formatInt(round)} finished with no improvement. Best remains: ${best}.`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategy: ${strategy}, method: ${method}${variantText}, calculation: ${quality}.`,
         addAtLeastOne: "Add at least one pallet with quantity greater than zero.",
@@ -1596,7 +1604,7 @@
         added: (count) => `${count} toegevoegd`,
         qtyAria: (name) => `Aantal pallets ${name}`,
         deleteAria: (name) => `${name} verwijderen`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% van tijd, verstreken ${elapsed}, max. resterend ${remaining}`,
+        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% van ronde, verstreken ${elapsed}, max. ${remaining}`,
         solverTrailer: ({ index }) => `Oplegger ${formatInt(index)} berekenen`,
         calculatingCpSat: "OR-Tools CP-SAT berekenen",
         cpsatLoading: "OR-Tools CP-SAT-engine laden",
@@ -1604,6 +1612,10 @@
         cpsatRange: ({ count, lower, upper }) =>
           `OR-Tools CP-SAT: ${formatInt(count)} pallets, opleggers ${formatInt(lower)}-${formatInt(upper)}`,
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimaliseren tot ${formatInt(seconds)}s`,
+        optimalBaseReady: ({ best }) => `Basisresultaat klaar: ${best}. Zoeken naar een betere indeling.`,
+        optimalRoundStart: ({ round, best }) => `CP-SAT ronde ${formatInt(round)}: echte solver-run. Beste: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT ronde ${formatInt(round)} heeft het resultaat verbeterd: ${best}.`,
+        optimalRoundNoImprovement: ({ round, best }) => `CP-SAT ronde ${formatInt(round)} klaar zonder verbetering. Beste blijft: ${best}.`,
         planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
           `${trailerText}, ${trailerLabel}, strategie: ${strategy}, methode: ${method}${variantText}, berekening: ${quality}.`,
         addAtLeastOne: "Voeg minimaal één pallet toe met een aantal groter dan nul.",
@@ -2227,6 +2239,21 @@
       return minutes > 0 ? `${minutes}:${String(seconds).padStart(2, "0")}` : `${seconds}s`;
     }
 
+    function cpSatCheckpointSeconds(itemCount, round, remainingMs) {
+      const remainingSeconds = Math.max(1, Math.floor(remainingMs / 1000));
+      const target = itemCount <= 25
+        ? (round === 1 ? 5 : 8)
+        : itemCount <= 60
+          ? (round === 1 ? 7 : 10)
+          : (round === 1 ? 9 : 15);
+      return Math.max(1, Math.min(target, remainingSeconds));
+    }
+
+    function planProgressSummary(plan) {
+      if (!plan) return t("noData");
+      return `${formatTrailerCount(plan.trailerCount)}, LDM ${formatDecimal((plan.usedLength || 0) / 1000, 2)}`;
+    }
+
     function updateCalculationProgress() {
       if (!calculationProgress) return;
       const elapsed = Math.max(0, nowMs() - calculationProgress.startedAt);
@@ -2296,6 +2323,11 @@
         stopCalculationProgress();
         stopCalculationPreview();
       }
+    }
+
+    function setCalculationMessage(text, kind = "warn") {
+      if (el.calcOverlayText) el.calcOverlayText.textContent = text;
+      updateStatus(kind, text);
     }
 
     function commitStoppedCalculation(context) {
@@ -3515,7 +3547,13 @@
           if (data.requestId !== requestId) return;
           if (data.type === "progress") {
             if (token === calculationToken) {
-              setCalculating(true, progressText(data, "calculatingCpSat"), {
+              const checkpointText = payload.checkpointRound
+                ? t("optimalRoundStart", {
+                  round: payload.checkpointRound,
+                  best: planProgressSummary(payload.warmStartPlan)
+                })
+                : progressText(data, "calculatingCpSat");
+              setCalculating(true, checkpointText, {
                 budgetMs: payload.maxTimeSeconds ? payload.maxTimeSeconds * 1000 : undefined
               });
             }
@@ -5203,25 +5241,113 @@
               ].filter(Boolean), trailer);
             }
             renderInterimPlan(baselinePlan);
+            setCalculating(true, t("optimalBaseReady", { best: planProgressSummary(baselinePlan) }), {
+              budgetMs: config.budgetMs
+            });
           } catch (error) {
             if (isAbortError(error) || token !== calculationToken) return currentPlan;
             console.warn("Fast baseline unavailable.", error);
           }
         }
 
-        try {
-          plan = quality === "deep" && !options.auto
-            ? await solveWithCpSatWorker({
-              ...solverPayload,
-              warmStartPlan: baselinePlan
-            }, token)
-            : await solveWithWorker(solverPayload, token);
-        } catch (error) {
-          if (isAbortError(error) || token !== calculationToken) return currentPlan;
-          if (baselinePlan) {
-            console.warn("OR-Tools CP-SAT unavailable, keeping fast baseline.", error);
-            plan = baselinePlan;
-          } else {
+        if (quality === "deep" && !options.auto) {
+          plan = baselinePlan;
+          let round = 0;
+          let lastCpSatError = null;
+
+          while (token === calculationToken && nowMs() < deadline) {
+            const remainingMs = deadline - nowMs();
+            const roundSeconds = cpSatCheckpointSeconds(items.length, round + 1, remainingMs);
+            if (roundSeconds <= 0) break;
+            round++;
+            const bestBeforeRound = pendingCalculation?.bestPlan || plan || baselinePlan;
+            setCalculating(true, t("optimalRoundStart", {
+              round,
+              best: planProgressSummary(bestBeforeRound)
+            }), {
+              budgetMs: roundSeconds * 1000,
+              reset: true
+            });
+
+            let candidate = null;
+            try {
+              candidate = await solveWithCpSatWorker({
+                ...solverPayload,
+                layoutVariant: state.layoutVariant + round * 9973,
+                maxTimeSeconds: roundSeconds,
+                warmStartPlan: bestBeforeRound,
+                checkpointRound: round
+              }, token);
+            } catch (error) {
+              if (isAbortError(error) || token !== calculationToken) return currentPlan;
+              lastCpSatError = error;
+              console.warn("OR-Tools CP-SAT checkpoint unavailable.", error);
+              break;
+            }
+
+            if (token !== calculationToken) return currentPlan;
+            candidate = {
+              ...candidate,
+              layoutVariant: state.layoutVariant,
+              searchQuality: "deep",
+              optimalSource: "cpsat-checkpoint",
+              checkpointRound: round
+            };
+
+            const selectedPlan = chooseBestFinalPlan([
+              pendingCalculation?.bestPlan,
+              plan,
+              candidate
+            ].filter(Boolean), trailer);
+
+            if (selectedPlan === candidate) {
+              plan = candidate;
+              renderInterimPlan(plan);
+              const message = t("optimalRoundImproved", {
+                round,
+                best: planProgressSummary(plan)
+              });
+              setCalculationMessage(message, "good");
+            } else {
+              plan = selectedPlan || plan || baselinePlan || candidate;
+              if (pendingCalculation && pendingCalculation.token === token) {
+                pendingCalculation.bestPlan = chooseBestFinalPlan([
+                  pendingCalculation.bestPlan,
+                  plan
+                ].filter(Boolean), trailer);
+              }
+              const message = t("optimalRoundNoImprovement", {
+                round,
+                best: planProgressSummary(plan)
+              });
+              setCalculationMessage(message, "warn");
+            }
+            await yieldToBrowser();
+            await new Promise((resolve) => setTimeout(resolve, 350));
+          }
+
+          if (!plan && lastCpSatError) {
+            console.warn("CP-SAT did not return a checkpoint, using fallback.", lastCpSatError);
+          }
+          plan = chooseBestFinalPlan([
+            pendingCalculation?.bestPlan,
+            plan,
+            baselinePlan
+          ].filter(Boolean), trailer) || plan || baselinePlan;
+          if (!plan) {
+            plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
+              searchQuality: quality,
+              layoutVariant: state.layoutVariant,
+              inputSeed: seed,
+              deadline
+            });
+          }
+          plan.searchQuality = "deep";
+        } else {
+          try {
+            plan = await solveWithWorker(solverPayload, token);
+          } catch (error) {
+            if (isAbortError(error) || token !== calculationToken) return currentPlan;
             console.warn("Primary solver unavailable, using fallback.", error);
             plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
               searchQuality: quality,
@@ -5232,28 +5358,6 @@
           }
         }
         if (token !== calculationToken) return currentPlan;
-        if (quality === "deep" && !options.auto) {
-          const selectedPlan = chooseBestFinalPlan([baselinePlan, plan].filter(Boolean), trailer);
-          if (selectedPlan === baselinePlan && plan !== baselinePlan) {
-            plan = {
-              ...baselinePlan,
-              strategyLabel: `${baselinePlan.strategyLabel || "worker"} + kontrola jakości`,
-              optimalSource: "fast-baseline"
-            };
-          } else if (selectedPlan) {
-            plan = {
-              ...selectedPlan,
-              optimalSource: selectedPlan === baselinePlan ? "fast-baseline" : "cpsat"
-            };
-          }
-          plan.searchQuality = "deep";
-        }
-        if (pendingCalculation && pendingCalculation.token === token) {
-          pendingCalculation.bestPlan = chooseBestFinalPlan([
-            pendingCalculation.bestPlan,
-            plan
-          ].filter(Boolean), trailer);
-        }
         currentPlan = {
           ...plan,
           trailer,
