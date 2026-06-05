@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet</title>
+  <title>LoadPallet v1.0</title>
   <style>
     :root {
       color-scheme: light;
@@ -175,11 +175,23 @@
     }
 
     .brand h1 {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 7px;
       margin: 0;
       font-size: 22px;
       line-height: 1.15;
       font-weight: 700;
       letter-spacing: 0;
+    }
+
+    .app-version {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
     }
 
     .brand p {
@@ -1086,7 +1098,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1>LoadPallet</h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.0</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1276,7 +1288,8 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.07";
+    const APP_VERSION = "2026-06-05.08";
+    const APP_DISPLAY_VERSION = "v1.0";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1966,12 +1979,13 @@
 
     function applyTranslations() {
       document.documentElement.lang = currentLang();
-      document.title = t("documentTitle");
+      document.title = `${t("documentTitle")} ${APP_DISPLAY_VERSION}`;
       if (el.language) {
         el.language.value = currentLang();
         el.language.setAttribute("aria-label", t("languageAria"));
       }
-      setText(".brand h1", t("appTitle"));
+      setText("#appTitleText", t("appTitle"));
+      setText("#appVersion", APP_DISPLAY_VERSION);
       setText(".brand p", t("appSubtitle"));
       el.resetDemo.textContent = t("clearList");
       el.refresh.textContent = t("refresh");
