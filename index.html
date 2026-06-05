@@ -1276,7 +1276,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.06";
+    const APP_VERSION = "2026-06-05.07";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1386,10 +1386,10 @@
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optymalizacja do ${formatInt(seconds)}s`,
         optimalBaseReady: ({ best }) => `Wynik bazowy gotowy: ${best}. Szukam lepszego układu.`,
         optimalRoundStart: ({ round, best }) => `CP-SAT runda ${formatInt(round)}: realny przebieg solvera. Najlepszy: ${best}.`,
-        optimalRoundImproved: ({ round, best }) => `CP-SAT runda ${formatInt(round)} poprawiła wynik: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT runda ${formatInt(round)} poprawiła układ. Najlepszy: ${best}.`,
         optimalRoundNoImprovement: ({ round, best }) => `CP-SAT runda ${formatInt(round)} zakończona, brak poprawy. Najlepszy nadal: ${best}.`,
-        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
-          `${trailerText}, ${trailerLabel}, strategia: ${strategy}, metoda: ${method}${variantText}, liczenie: ${quality}.`,
+        planSubtitle: ({ trailerText, trailerLabel, quality }) =>
+          `${trailerText}, ${trailerLabel}, liczenie: ${quality}.`,
         addAtLeastOne: "Dodaj co najmniej jedną paletę z ilością większą od zera.",
         unplacedItem: ({ name, count }) => `Nie zmieszczono: ${name} - ${count} szt.`,
         loadSplit: (count) => `Ładunek rozłożono na ${count}.`,
@@ -1500,10 +1500,10 @@
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimizing for up to ${formatInt(seconds)}s`,
         optimalBaseReady: ({ best }) => `Baseline ready: ${best}. Searching for a better layout.`,
         optimalRoundStart: ({ round, best }) => `CP-SAT round ${formatInt(round)}: real solver pass. Best: ${best}.`,
-        optimalRoundImproved: ({ round, best }) => `CP-SAT round ${formatInt(round)} improved the result: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT round ${formatInt(round)} improved the layout. Best: ${best}.`,
         optimalRoundNoImprovement: ({ round, best }) => `CP-SAT round ${formatInt(round)} finished with no improvement. Best remains: ${best}.`,
-        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
-          `${trailerText}, ${trailerLabel}, strategy: ${strategy}, method: ${method}${variantText}, calculation: ${quality}.`,
+        planSubtitle: ({ trailerText, trailerLabel, quality }) =>
+          `${trailerText}, ${trailerLabel}, calculation: ${quality}.`,
         addAtLeastOne: "Add at least one pallet with quantity greater than zero.",
         unplacedItem: ({ name, count }) => `Not placed: ${name} - ${count} pcs.`,
         loadSplit: (count) => `Load split across ${count}.`,
@@ -1614,10 +1614,10 @@
         cpsatOptimizing: ({ seconds }) => `OR-Tools CP-SAT: optimaliseren tot ${formatInt(seconds)}s`,
         optimalBaseReady: ({ best }) => `Basisresultaat klaar: ${best}. Zoeken naar een betere indeling.`,
         optimalRoundStart: ({ round, best }) => `CP-SAT ronde ${formatInt(round)}: echte solver-run. Beste: ${best}.`,
-        optimalRoundImproved: ({ round, best }) => `CP-SAT ronde ${formatInt(round)} heeft het resultaat verbeterd: ${best}.`,
+        optimalRoundImproved: ({ round, best }) => `CP-SAT ronde ${formatInt(round)} heeft de indeling verbeterd. Beste: ${best}.`,
         optimalRoundNoImprovement: ({ round, best }) => `CP-SAT ronde ${formatInt(round)} klaar zonder verbetering. Beste blijft: ${best}.`,
-        planSubtitle: ({ trailerText, trailerLabel, strategy, method, variantText, quality }) =>
-          `${trailerText}, ${trailerLabel}, strategie: ${strategy}, methode: ${method}${variantText}, berekening: ${quality}.`,
+        planSubtitle: ({ trailerText, trailerLabel, quality }) =>
+          `${trailerText}, ${trailerLabel}, berekening: ${quality}.`,
         addAtLeastOne: "Voeg minimaal één pallet toe met een aantal groter dan nul.",
         unplacedItem: ({ name, count }) => `Niet geplaatst: ${name} - ${count} st.`,
         loadSplit: (count) => `Lading verdeeld over ${count}.`,
@@ -5403,14 +5403,10 @@
 
       const trailerLabel = `${formatInt(plan.trailer.length)} x ${formatInt(plan.trailer.width)} mm`;
       const trailerText = formatTrailerCount(plan.trailerCount);
-      const variantText = plan.layoutVariant > 0 ? `, ${t("variant")}: ${formatInt(plan.layoutVariant + 1)}` : "";
       const qualityText = plan.autoSearch ? t("quickCalc") : qualityLabel(plan.searchQuality).toLowerCase();
       el.planSubtitle.textContent = t("planSubtitle", {
         trailerText,
         trailerLabel,
-        strategy: planLabel(plan.strategyLabel),
-        method: planLabel(plan.method),
-        variantText,
         quality: qualityText
       });
       updateStatus(missing === 0 ? "good" : "warn", missing === 0 ? t("allPlaced") : t("hasUnplaced"));
