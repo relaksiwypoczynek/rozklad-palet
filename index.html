@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.5</title>
+  <title>LoadPallet v1.6</title>
   <style>
     :root {
       color-scheme: light;
@@ -783,42 +783,44 @@
     }
 
     .calc-overlay {
-      position: absolute;
-      inset: 0;
-      z-index: 3;
+      position: fixed;
+      top: max(8px, env(safe-area-inset-top));
+      left: 8px;
+      right: 8px;
+      z-index: 80;
       display: none;
-      place-items: start center;
+      justify-content: center;
       box-sizing: border-box;
-      padding: 82px 12px 0;
-      background: rgba(248, 250, 252, 0.72);
       pointer-events: none;
     }
 
     .calc-badge {
-      display: inline-flex;
+      display: flex;
       flex-direction: column;
       align-items: stretch;
-      gap: 8px;
+      gap: 9px;
       box-sizing: border-box;
-      width: min(340px, 100%);
+      width: min(560px, 100%);
       max-width: 100%;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #ffffff;
-      padding: 10px 12px;
+      padding: 10px;
       color: var(--ink);
       font-weight: 700;
       box-shadow: 0 10px 22px rgba(23, 32, 51, 0.12);
+      pointer-events: auto;
     }
 
     .calc-row {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 9px;
       min-width: 0;
     }
 
-    .calc-row span:last-child {
+    .calc-row-text {
+      flex: 1 1 auto;
       min-width: 0;
       line-height: 1.25;
       white-space: normal;
@@ -826,7 +828,24 @@
     }
 
     .calc-row .status-spinner {
-      margin-top: 2px;
+      flex: 0 0 auto;
+    }
+
+    .calc-row .stop-button {
+      flex: 0 0 auto;
+      min-height: 32px;
+      min-width: 62px;
+      padding: 0 10px;
+    }
+
+    .calc-progress-stack {
+      display: grid;
+      gap: 7px;
+    }
+
+    .calc-progress-group {
+      display: grid;
+      gap: 4px;
     }
 
     .calc-progress {
@@ -844,6 +863,10 @@
       transition: width 0.25s ease;
     }
 
+    .calc-progress-bar.overall {
+      background: linear-gradient(90deg, #0f766e, #15803d);
+    }
+
     .calc-meta {
       color: var(--muted);
       font-size: 12px;
@@ -854,7 +877,7 @@
     }
 
     body.is-calculating .calc-overlay {
-      display: grid;
+      display: flex;
     }
 
     .empty-state {
@@ -1098,7 +1121,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.5</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.6</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1208,7 +1231,6 @@
             </label>
             <button id="refreshBtn" type="button">Odśwież</button>
             <button id="recalcBtn" class="primary" type="button">Przelicz</button>
-            <button id="stopCalcBtn" class="danger stop-button" type="button" hidden>STOP</button>
           </div>
         </div>
       </section>
@@ -1259,12 +1281,23 @@
             <div class="calc-badge">
               <div class="calc-row">
                 <span class="status-spinner"></span>
-                <span id="calcOverlayText">Liczenie układu</span>
+                <span id="calcOverlayText" class="calc-row-text">Liczenie układu</span>
+                <button id="stopCalcBtn" class="danger stop-button" type="button" hidden>STOP</button>
               </div>
-              <div class="calc-progress" aria-hidden="true">
-                <div id="calcProgressBar" class="calc-progress-bar"></div>
+              <div class="calc-progress-stack">
+                <div class="calc-progress-group">
+                  <div id="calcOverallProgressMeta" class="calc-meta">Start</div>
+                  <div class="calc-progress" aria-hidden="true">
+                    <div id="calcOverallProgressBar" class="calc-progress-bar overall"></div>
+                  </div>
+                </div>
+                <div class="calc-progress-group">
+                  <div id="calcProgressMeta" class="calc-meta">Start</div>
+                  <div class="calc-progress" aria-hidden="true">
+                    <div id="calcProgressBar" class="calc-progress-bar"></div>
+                  </div>
+                </div>
               </div>
-              <div id="calcProgressMeta" class="calc-meta">Start</div>
             </div>
           </div>
           <div id="tooltip" class="tooltip"></div>
@@ -1288,8 +1321,8 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.13";
-    const APP_DISPLAY_VERSION = "v1.5";
+    const APP_VERSION = "2026-06-05.14";
+    const APP_DISPLAY_VERSION = "v1.6";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1390,7 +1423,8 @@
         added: (count) => `Dodano ${count}`,
         qtyAria: (name) => `Ilość palet ${name}`,
         deleteAria: (name) => `Usuń ${name}`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% rundy, minęło ${elapsed}, maks. ${remaining}`,
+        progressOverall: ({ percent, elapsed, remaining }) => `Całość ${percent}%, minęło ${elapsed}, zostało maks. ${remaining}`,
+        progressRound: ({ percent, elapsed, remaining }) => `Runda ${percent}%, minęło ${elapsed}, zostało maks. ${remaining}`,
         solverTrailer: ({ index }) => `Liczenie naczepy ${formatInt(index)}`,
         calculatingCpSat: "Liczenie OR-Tools CP-SAT",
         cpsatLoading: "Ładowanie silnika OR-Tools CP-SAT",
@@ -1512,7 +1546,8 @@
         added: (count) => `Added ${count}`,
         qtyAria: (name) => `Pallet quantity ${name}`,
         deleteAria: (name) => `Delete ${name}`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% of round, elapsed ${elapsed}, max ${remaining}`,
+        progressOverall: ({ percent, elapsed, remaining }) => `Overall ${percent}%, elapsed ${elapsed}, max remaining ${remaining}`,
+        progressRound: ({ percent, elapsed, remaining }) => `Round ${percent}%, elapsed ${elapsed}, max remaining ${remaining}`,
         solverTrailer: ({ index }) => `Calculating trailer ${formatInt(index)}`,
         calculatingCpSat: "Calculating OR-Tools CP-SAT",
         cpsatLoading: "Loading OR-Tools CP-SAT engine",
@@ -1634,7 +1669,8 @@
         added: (count) => `${count} toegevoegd`,
         qtyAria: (name) => `Aantal pallets ${name}`,
         deleteAria: (name) => `${name} verwijderen`,
-        progressMeta: ({ percent, elapsed, remaining }) => `${percent}% van ronde, verstreken ${elapsed}, max. ${remaining}`,
+        progressOverall: ({ percent, elapsed, remaining }) => `Totaal ${percent}%, verstreken ${elapsed}, max. resterend ${remaining}`,
+        progressRound: ({ percent, elapsed, remaining }) => `Ronde ${percent}%, verstreken ${elapsed}, max. resterend ${remaining}`,
         solverTrailer: ({ index }) => `Oplegger ${formatInt(index)} berekenen`,
         calculatingCpSat: "OR-Tools CP-SAT berekenen",
         cpsatLoading: "OR-Tools CP-SAT-engine laden",
@@ -1784,6 +1820,8 @@
       canvas: document.getElementById("deckCanvas"),
       canvasShell: document.getElementById("canvasShell"),
       calcOverlayText: document.getElementById("calcOverlayText"),
+      calcOverallProgressBar: document.getElementById("calcOverallProgressBar"),
+      calcOverallProgressMeta: document.getElementById("calcOverallProgressMeta"),
       calcProgressBar: document.getElementById("calcProgressBar"),
       calcProgressMeta: document.getElementById("calcProgressMeta"),
       tooltip: document.getElementById("tooltip"),
@@ -2055,6 +2093,7 @@
       if (!currentPlan) el.planSubtitle.textContent = t("noData");
       el.canvas.setAttribute("aria-label", t("deckAria"));
       if (!isCalculating && el.calcOverlayText) el.calcOverlayText.textContent = t("calculating");
+      if (!isCalculating && el.calcOverallProgressMeta) el.calcOverallProgressMeta.textContent = t("calcStart");
       if (!isCalculating && el.calcProgressMeta) el.calcProgressMeta.textContent = t("calcStart");
       const resultHeadings = document.querySelectorAll(".result-box h3");
       if (resultHeadings[0]) resultHeadings[0].textContent = t("legend");
@@ -2294,16 +2333,29 @@
 
     function updateCalculationProgress() {
       if (!calculationProgress) return;
-      const elapsed = Math.max(0, nowMs() - calculationProgress.startedAt);
-      const budget = Math.max(1, calculationProgress.budgetMs);
-      const percent = Math.max(0, Math.min(100, (elapsed / budget) * 100));
-      const remaining = Math.max(0, budget - elapsed);
-      if (el.calcProgressBar) el.calcProgressBar.style.width = `${percent.toFixed(1)}%`;
+      const currentTime = nowMs();
+      const overallElapsed = Math.max(0, currentTime - calculationProgress.overallStartedAt);
+      const overallBudget = Math.max(1, calculationProgress.overallBudgetMs);
+      const overallPercent = Math.max(0, Math.min(100, (overallElapsed / overallBudget) * 100));
+      const overallRemaining = Math.max(0, overallBudget - overallElapsed);
+      const roundElapsed = Math.max(0, currentTime - calculationProgress.roundStartedAt);
+      const roundBudget = Math.max(1, calculationProgress.roundBudgetMs);
+      const roundPercent = Math.max(0, Math.min(100, (roundElapsed / roundBudget) * 100));
+      const roundRemaining = Math.max(0, roundBudget - roundElapsed);
+      if (el.calcOverallProgressBar) el.calcOverallProgressBar.style.width = `${overallPercent.toFixed(1)}%`;
+      if (el.calcOverallProgressMeta) {
+        el.calcOverallProgressMeta.textContent = t("progressOverall", {
+          percent: Math.round(overallPercent),
+          elapsed: formatDurationMs(overallElapsed),
+          remaining: formatDurationMs(overallRemaining)
+        });
+      }
+      if (el.calcProgressBar) el.calcProgressBar.style.width = `${roundPercent.toFixed(1)}%`;
       if (el.calcProgressMeta) {
-        el.calcProgressMeta.textContent = t("progressMeta", {
-          percent: Math.round(percent),
-          elapsed: formatDurationMs(elapsed),
-          remaining: formatDurationMs(remaining)
+        el.calcProgressMeta.textContent = t("progressRound", {
+          percent: Math.round(roundPercent),
+          elapsed: formatDurationMs(roundElapsed),
+          remaining: formatDurationMs(roundRemaining)
         });
       }
     }
@@ -2314,6 +2366,8 @@
         calculationProgressTimer = null;
       }
       calculationProgress = null;
+      if (el.calcOverallProgressBar) el.calcOverallProgressBar.style.width = "0%";
+      if (el.calcOverallProgressMeta) el.calcOverallProgressMeta.textContent = "";
       if (el.calcProgressBar) el.calcProgressBar.style.width = "0%";
       if (el.calcProgressMeta) el.calcProgressMeta.textContent = "";
     }
@@ -2347,13 +2401,27 @@
       el.stop.disabled = !active;
       if (el.calcOverlayText) el.calcOverlayText.textContent = text;
       if (active) {
-        const budgetMs = Math.max(1, Number(options.budgetMs || calculationProgress?.budgetMs || 1000));
-        if (!calculationProgress || options.reset) {
-          calculationProgress = { startedAt: nowMs(), budgetMs };
+        const currentTime = nowMs();
+        const roundBudgetMs = Math.max(1, Number(options.budgetMs || options.roundBudgetMs || calculationProgress?.roundBudgetMs || 1000));
+        const overallBudgetMs = Math.max(1, Number(options.overallBudgetMs || calculationProgress?.overallBudgetMs || roundBudgetMs));
+        if (!calculationProgress) {
+          calculationProgress = {
+            overallStartedAt: currentTime,
+            overallBudgetMs,
+            roundStartedAt: currentTime,
+            roundBudgetMs
+          };
           if (calculationProgressTimer) clearInterval(calculationProgressTimer);
           calculationProgressTimer = setInterval(updateCalculationProgress, 250);
+        } else if (options.reset) {
+          calculationProgress.roundStartedAt = currentTime;
+          calculationProgress.roundBudgetMs = roundBudgetMs;
+          calculationProgress.overallBudgetMs = overallBudgetMs;
         } else if (options.budgetMs) {
-          calculationProgress.budgetMs = budgetMs;
+          calculationProgress.roundBudgetMs = roundBudgetMs;
+          calculationProgress.overallBudgetMs = overallBudgetMs;
+        } else if (options.overallBudgetMs) {
+          calculationProgress.overallBudgetMs = overallBudgetMs;
         }
         updateCalculationProgress();
         updateStatus("warn", text);
@@ -5259,7 +5327,11 @@
       const quality = options.auto ? "fast" : state.searchQuality;
       const config = searchQualityConfig(quality);
       const qualityForStatus = options.auto ? t("quickCalc") : qualityLabel(quality).toLowerCase();
-      setCalculating(true, `${t("calculating")} (${qualityForStatus})`, { budgetMs: config.budgetMs, reset: true });
+      setCalculating(true, `${t("calculating")} (${qualityForStatus})`, {
+        budgetMs: config.budgetMs,
+        overallBudgetMs: config.budgetMs,
+        reset: true
+      });
       await yieldToBrowser();
 
       try {
@@ -5396,7 +5468,7 @@
             const bestAfterBaseline = bestKnownPlan(baselinePlan);
             renderInterimPlan(bestAfterBaseline);
             setCalculating(true, t("optimalBaseReady", { best: planProgressSummary(bestAfterBaseline) }), {
-              budgetMs: config.budgetMs
+              overallBudgetMs: config.budgetMs
             });
           } catch (error) {
             if (isAbortError(error) || token !== calculationToken) return currentPlan;
