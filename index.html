@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.2</title>
+  <title>LoadPallet v1.3</title>
   <style>
     :root {
       color-scheme: light;
@@ -1098,7 +1098,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.2</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.3</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1288,8 +1288,8 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.10";
-    const APP_DISPLAY_VERSION = "v1.2";
+    const APP_VERSION = "2026-06-05.11";
+    const APP_DISPLAY_VERSION = "v1.3";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1408,6 +1408,13 @@
         unplacedItem: ({ name, count }) => `Nie zmieszczono: ${name} - ${count} szt.`,
         loadSplit: (count) => `Ładunek rozłożono na ${count}.`,
         tooLarge: (name) => `${name || "Paleta"} jest większa niż dostępny footprint naczepy.`,
+        geometryInvalidPlan: "Solver zwrócił niepoprawną geometrię planu.",
+        geometryCountMismatch: ({ placed, expected }) =>
+          `Błąd geometrii: ułożono ${formatInt(placed)} z ${formatInt(expected)} palet.`,
+        geometryOutOfBounds: ({ name, trailer }) =>
+          `Błąd geometrii: ${name} poza obrysem naczepy ${formatInt(trailer)}.`,
+        geometryOverlap: ({ first, second, trailer }) =>
+          `Błąd geometrii: ${first} nachodzi na ${second} na naczepie ${formatInt(trailer)}.`,
         cpsatStatusOptimal: "optymalność potwierdzona",
         cpsatStatusFeasible: "najlepszy znaleziony wynik w limicie czasu, bez dowodu optimum",
         cpsatInfo: ({ status, variables, constraints }) =>
@@ -1523,6 +1530,13 @@
         unplacedItem: ({ name, count }) => `Not placed: ${name} - ${count} pcs.`,
         loadSplit: (count) => `Load split across ${count}.`,
         tooLarge: (name) => `${name || "Pallet"} is larger than the available trailer footprint.`,
+        geometryInvalidPlan: "The solver returned invalid plan geometry.",
+        geometryCountMismatch: ({ placed, expected }) =>
+          `Geometry error: placed ${formatInt(placed)} of ${formatInt(expected)} pallets.`,
+        geometryOutOfBounds: ({ name, trailer }) =>
+          `Geometry error: ${name} is outside trailer ${formatInt(trailer)}.`,
+        geometryOverlap: ({ first, second, trailer }) =>
+          `Geometry error: ${first} overlaps ${second} on trailer ${formatInt(trailer)}.`,
         cpsatStatusOptimal: "optimality proven",
         cpsatStatusFeasible: "best result found within the time limit, without proof of optimum",
         cpsatInfo: ({ status, variables, constraints }) =>
@@ -1638,6 +1652,13 @@
         unplacedItem: ({ name, count }) => `Niet geplaatst: ${name} - ${count} st.`,
         loadSplit: (count) => `Lading verdeeld over ${count}.`,
         tooLarge: (name) => `${name || "Pallet"} is groter dan de beschikbare footprint van de oplegger.`,
+        geometryInvalidPlan: "De solver heeft ongeldige plangeometrie teruggegeven.",
+        geometryCountMismatch: ({ placed, expected }) =>
+          `Geometriefout: ${formatInt(placed)} van ${formatInt(expected)} pallets geplaatst.`,
+        geometryOutOfBounds: ({ name, trailer }) =>
+          `Geometriefout: ${name} valt buiten oplegger ${formatInt(trailer)}.`,
+        geometryOverlap: ({ first, second, trailer }) =>
+          `Geometriefout: ${first} overlapt ${second} op oplegger ${formatInt(trailer)}.`,
         cpsatStatusOptimal: "optimaliteit bewezen",
         cpsatStatusFeasible: "beste resultaat binnen de tijdslimiet, zonder bewijs van optimum",
         cpsatInfo: ({ status, variables, constraints }) =>
@@ -5104,8 +5125,68 @@
       };
     }
 
+    function planGeometryErrors(plan, trailer, expectedCount = null) {
+      const errors = [];
+      const placed = Array.isArray(plan?.placed) ? plan.placed : [];
+      const unplaced = Array.isArray(plan?.unplaced) ? plan.unplaced : [];
+      if (expectedCount != null && placed.length + unplaced.length !== expectedCount) {
+        errors.push(t("geometryCountMismatch", {
+          placed: placed.length + unplaced.length,
+          expected: expectedCount
+        }));
+      }
+
+      const byTrailer = new Map();
+      for (const item of placed) {
+        const trailerIndex = Math.max(1, Math.floor(item.trailerIndex || 1));
+        if (!byTrailer.has(trailerIndex)) byTrailer.set(trailerIndex, []);
+        byTrailer.get(trailerIndex).push(item);
+
+        const x = Number(item.x);
+        const y = Number(item.y);
+        const length = Number(item.packLength || item.length);
+        const width = Number(item.packWidth || item.width);
+        const name = item.name || item.id || t("pallet");
+        if (![x, y, length, width].every(Number.isFinite) || length <= 0 || width <= 0) {
+          errors.push(t("geometryOutOfBounds", { name, trailer: trailerIndex }));
+          continue;
+        }
+        if (x < 0 || y < 0 || x + length > trailer.length || y + width > trailer.width) {
+          errors.push(t("geometryOutOfBounds", { name, trailer: trailerIndex }));
+        }
+      }
+
+      for (const [trailerIndex, group] of byTrailer) {
+        for (let i = 0; i < group.length; i++) {
+          const first = group[i];
+          for (let j = i + 1; j < group.length; j++) {
+            const second = group[j];
+            if (
+              rangesOverlap(first.x, first.packLength || first.length, second.x, second.packLength || second.length) &&
+              rangesOverlap(first.y, first.packWidth || first.width, second.y, second.packWidth || second.width)
+            ) {
+              errors.push(t("geometryOverlap", {
+                first: first.name || first.id || t("pallet"),
+                second: second.name || second.id || t("pallet"),
+                trailer: trailerIndex
+              }));
+            }
+          }
+        }
+      }
+
+      return errors;
+    }
+
+    function isPlanGeometryValid(plan, trailer, expectedCount = null) {
+      return planGeometryErrors(plan, trailer, expectedCount).length === 0;
+    }
+
     function buildIssues(plan, items, trailer) {
       const issues = [];
+      for (const error of planGeometryErrors(plan, trailer, items.length)) {
+        issues.push({ kind: "bad", text: error });
+      }
       if (items.length === 0) {
         issues.push({ kind: "info", text: t("addAtLeastOne") });
       }
@@ -5212,13 +5293,33 @@
 
         let plan;
         let baselinePlan = null;
+        const validPlan = (candidate) => {
+          if (!candidate) return null;
+          const errors = planGeometryErrors(candidate, trailer, items.length);
+          if (errors.length > 0) {
+            console.warn("Rejected invalid layout geometry.", errors, candidate);
+            return null;
+          }
+          return candidate;
+        };
+        const chooseBestValidPlan = (plans) =>
+          chooseBestFinalPlan(plans.map(validPlan).filter(Boolean), trailer);
+        const bestKnownPlan = (...plans) =>
+          chooseBestValidPlan([
+            pendingCalculation?.bestPlan,
+            plan,
+            baselinePlan,
+            currentPlan,
+            ...plans
+          ].filter(Boolean));
         const renderInterimPlan = (candidate) => {
           if (!candidate || token !== calculationToken) return;
+          if (!validPlan(candidate)) return;
           if (pendingCalculation && pendingCalculation.token === token) {
-            pendingCalculation.bestPlan = chooseBestFinalPlan([
+            pendingCalculation.bestPlan = chooseBestValidPlan([
               pendingCalculation.bestPlan,
               candidate
-            ].filter(Boolean), trailer);
+            ].filter(Boolean));
           }
           const previewPlan = {
             ...candidate,
@@ -5252,10 +5353,10 @@
             };
             if (pendingCalculation && pendingCalculation.token === token) {
               pendingCalculation.baselinePlan = baselinePlan;
-              pendingCalculation.bestPlan = chooseBestFinalPlan([
+              pendingCalculation.bestPlan = chooseBestValidPlan([
                 pendingCalculation.bestPlan,
                 baselinePlan
-              ].filter(Boolean), trailer);
+              ].filter(Boolean));
             }
             renderInterimPlan(baselinePlan);
             setCalculating(true, t("optimalBaseReady", { best: planProgressSummary(baselinePlan) }), {
@@ -5277,7 +5378,7 @@
             const roundSeconds = cpSatCheckpointSeconds(items.length, round + 1, remainingMs);
             if (roundSeconds <= 0) break;
             round++;
-            const bestBeforeRound = pendingCalculation?.bestPlan || plan || baselinePlan;
+            const bestBeforeRound = bestKnownPlan();
             setCalculating(true, t("optimalRoundStart", {
               round,
               best: planProgressSummary(bestBeforeRound)
@@ -5311,11 +5412,11 @@
               checkpointRound: round
             };
 
-            const selectedPlan = chooseBestFinalPlan([
+            const selectedPlan = chooseBestValidPlan([
               pendingCalculation?.bestPlan,
               plan,
               candidate
-            ].filter(Boolean), trailer);
+            ].filter(Boolean));
 
             if (selectedPlan === candidate) {
               plan = candidate;
@@ -5326,12 +5427,12 @@
               });
               setCalculationMessage(message, "good");
             } else {
-              plan = selectedPlan || plan || baselinePlan || candidate;
+              plan = selectedPlan || bestKnownPlan(candidate) || candidate;
               if (pendingCalculation && pendingCalculation.token === token) {
-                pendingCalculation.bestPlan = chooseBestFinalPlan([
+                pendingCalculation.bestPlan = chooseBestValidPlan([
                   pendingCalculation.bestPlan,
                   plan
-                ].filter(Boolean), trailer);
+                ].filter(Boolean));
               }
               const message = t("optimalRoundNoImprovement", {
                 round,
@@ -5346,11 +5447,11 @@
           if (!plan && lastCpSatError) {
             console.warn("CP-SAT did not return a checkpoint, using fallback.", lastCpSatError);
           }
-          plan = chooseBestFinalPlan([
+          plan = chooseBestValidPlan([
             pendingCalculation?.bestPlan,
             plan,
             baselinePlan
-          ].filter(Boolean), trailer) || plan || baselinePlan;
+          ].filter(Boolean)) || validPlan(plan) || validPlan(baselinePlan);
           if (!plan) {
             plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
               searchQuality: quality,
@@ -5375,6 +5476,22 @@
           }
         }
         if (token !== calculationToken) return currentPlan;
+        if (!isPlanGeometryValid(plan, trailer, items.length)) {
+          console.warn("Final layout failed geometry validation.", planGeometryErrors(plan, trailer, items.length), plan);
+          const fallbackPlan = chooseBestValidPlan([
+            pendingCalculation?.bestPlan,
+            baselinePlan
+          ].filter(Boolean)) || await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
+            searchQuality: quality,
+            layoutVariant: state.layoutVariant,
+            inputSeed: seed,
+            deadline
+          });
+          if (!isPlanGeometryValid(fallbackPlan, trailer, items.length)) {
+            throw new Error(t("geometryInvalidPlan"));
+          }
+          plan = fallbackPlan;
+        }
         currentPlan = {
           ...plan,
           trailer,

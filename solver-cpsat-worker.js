@@ -8,6 +8,7 @@ import {
 import { toLinearExpr } from "./vendor/cpsat-js/dist/model/linear-expr.js";
 
 let cachedSolver = null;
+const CP_SAT_GRID_MM = 10;
 
 self.onmessage = async (event) => {
   const { requestId, payload } = event.data || {};
@@ -44,6 +45,39 @@ function progress(requestId, messageKey, params = {}, detail = "") {
 function clampNumber(value, min, fallback) {
   const parsed = Number(value);
   return Math.max(min, Number.isFinite(parsed) ? parsed : fallback);
+}
+
+function toModelSize(value) {
+  return Math.max(1, Math.ceil(clampNumber(value, 0, 0) / CP_SAT_GRID_MM));
+}
+
+function toModelLimit(value) {
+  return Math.max(1, Math.floor(clampNumber(value, 1, 1) / CP_SAT_GRID_MM));
+}
+
+function toModelCoordinate(value) {
+  return Math.max(0, Math.round(clampNumber(value, 0, 0) / CP_SAT_GRID_MM));
+}
+
+function toMillimeters(value) {
+  return Math.round(value) * CP_SAT_GRID_MM;
+}
+
+function scaleItemsForCpSat(items) {
+  return items.map((item) => {
+    const packLength = toModelSize(item.packLength);
+    const packWidth = toModelSize(item.packWidth);
+    return {
+      ...item,
+      sourceItem: item,
+      length: toModelSize(item.length),
+      width: toModelSize(item.width),
+      packLength,
+      packWidth,
+      packArea: packLength * packWidth,
+      actualArea: toModelSize(item.length) * toModelSize(item.width)
+    };
+  });
 }
 
 function expandItems(rows, gap) {
@@ -87,7 +121,9 @@ function getOrientations(item, trailer, allowRotate) {
     actualLength: item.length,
     actualWidth: item.width
   }];
-  if (allowRotate && item.length !== item.width) {
+  const sourceItem = item.sourceItem || item;
+  const canRotate = item.length !== item.width || sourceItem.length !== sourceItem.width;
+  if (allowRotate && canRotate) {
     orientations.push({
       rotated: true,
       packLength: item.packWidth,
@@ -322,11 +358,18 @@ function greedyWarmStart(items, trailer, allowRotate) {
   };
 }
 
-function warmStartFromPlan(items, plan, trailer, allowRotate) {
+function warmStartFromPlan(items, plan, trailer, allowRotate, coordinateScale = 1) {
   if (!plan || !Array.isArray(plan.placed) || plan.placed.length !== items.length) return null;
   const itemById = new Map(items.map((item) => [item.id, item]));
   const bins = [];
   const placements = new Map();
+  const scaleCoord = (value) => coordinateScale === 1
+    ? Math.round(value)
+    : toModelCoordinate(value);
+  const scaleSize = (value) => coordinateScale === 1
+    ? Math.round(value)
+    : toModelSize(value);
+  const sizeTolerance = coordinateScale === 1 ? 2 : 1;
 
   for (const placed of plan.placed) {
     const item = itemById.get(placed.id);
@@ -334,16 +377,16 @@ function warmStartFromPlan(items, plan, trailer, allowRotate) {
     const orientations = getOrientations(item, trailer, allowRotate);
     const orientation = orientations.find((orient) =>
       Boolean(orient.rotated) === Boolean(placed.rotated) &&
-      Math.abs(orient.packLength - placed.packLength) <= 2 &&
-      Math.abs(orient.packWidth - placed.packWidth) <= 2
+      Math.abs(orient.packLength - scaleSize(placed.packLength)) <= sizeTolerance &&
+      Math.abs(orient.packWidth - scaleSize(placed.packWidth)) <= sizeTolerance
     ) || orientations.find((orient) =>
-      Math.abs(orient.packLength - placed.packLength) <= 2 &&
-      Math.abs(orient.packWidth - placed.packWidth) <= 2
+      Math.abs(orient.packLength - scaleSize(placed.packLength)) <= sizeTolerance &&
+      Math.abs(orient.packWidth - scaleSize(placed.packWidth)) <= sizeTolerance
     );
     if (!orientation) return null;
 
-    const x = Math.round(placed.x);
-    const y = Math.round(placed.y);
+    const x = scaleCoord(placed.x);
+    const y = scaleCoord(placed.y);
     if (x < 0 || y < 0 || x + orientation.packLength > trailer.length || y + orientation.packWidth > trailer.width) {
       return null;
     }
@@ -882,6 +925,55 @@ function buildTrailerSummary(trailerPlaced, trailer, trailerIndex, strategyLabel
   };
 }
 
+function planGeometryErrors(placed, trailer, expectedCount = null) {
+  const errors = [];
+  if (expectedCount != null && placed.length !== expectedCount) {
+    errors.push(`placed count ${placed.length} differs from expected ${expectedCount}`);
+  }
+
+  const byTrailer = new Map();
+  for (const item of placed) {
+    const trailerIndex = Math.max(1, Math.floor(item.trailerIndex || 1));
+    if (!byTrailer.has(trailerIndex)) byTrailer.set(trailerIndex, []);
+    byTrailer.get(trailerIndex).push(item);
+
+    const x = Number(item.x);
+    const y = Number(item.y);
+    const length = Number(item.packLength || item.length);
+    const width = Number(item.packWidth || item.width);
+    if (![x, y, length, width].every(Number.isFinite) || length <= 0 || width <= 0) {
+      errors.push(`${item.name || item.id} has invalid geometry`);
+      continue;
+    }
+    if (x < 0 || y < 0 || x + length > trailer.length || y + width > trailer.width) {
+      errors.push(`${item.name || item.id} is outside trailer ${trailerIndex}`);
+    }
+  }
+
+  for (const [trailerIndex, group] of byTrailer) {
+    for (let i = 0; i < group.length; i++) {
+      const a = group[i];
+      for (let j = i + 1; j < group.length; j++) {
+        const b = group[j];
+        if (
+          rangesOverlap(a.x, a.packLength || a.length, b.x, b.packLength || b.length) &&
+          rangesOverlap(a.y, a.packWidth || a.width, b.y, b.packWidth || b.width)
+        ) {
+          errors.push(`${a.name || a.id} overlaps ${b.name || b.id} on trailer ${trailerIndex}`);
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+function assertValidPlanGeometry(placed, trailer, expectedCount) {
+  const errors = planGeometryErrors(placed, trailer, expectedCount);
+  if (errors.length > 0) {
+    throw new Error(`CP-SAT geometry invariant failed: ${errors.slice(0, 3).join("; ")}`);
+  }
+}
+
 function linearSum(terms) {
   if (terms.length === 0) return 0;
   let expr = toExpr(terms[0]);
@@ -968,16 +1060,21 @@ function solveCpSatLayout(solver, payload, requestId) {
     length: Math.floor(clampNumber(payload.trailer?.length, 1, 13620)),
     width: Math.floor(clampNumber(payload.trailer?.width, 1, 2480))
   };
+  const modelTrailer = {
+    length: toModelLimit(trailer.length),
+    width: toModelLimit(trailer.width)
+  };
   const gap = Math.floor(clampNumber(payload.gap, 0, 0));
   const allowRotate = payload.allowRotate !== false;
   const layoutVariant = Math.max(0, Math.floor(payload.layoutVariant || 0));
   const expandedItems = expandItems(payload.rows || [], gap);
-  const items = orderItemsForVariant(expandedItems, layoutVariant, payload.inputSeed || 1);
+  const modelItems = scaleItemsForCpSat(expandedItems);
+  const items = orderItemsForVariant(modelItems, layoutVariant, payload.inputSeed || 1);
   const totalArea = items.reduce((sum, item) => sum + item.packArea, 0);
-  const lowerBound = Math.max(1, Math.ceil(totalArea / Math.max(1, trailer.length * trailer.width)));
-  const warmStart = warmStartFromPlan(items, payload.warmStartPlan, trailer, allowRotate) ||
-    greedyWarmStart(items, trailer, allowRotate);
-  const upperBound = warmStart ? warmStart.count : greedyUpperBound(items, trailer, allowRotate);
+  const lowerBound = Math.max(1, Math.ceil(totalArea / Math.max(1, modelTrailer.length * modelTrailer.width)));
+  const warmStart = warmStartFromPlan(items, payload.warmStartPlan, modelTrailer, allowRotate, CP_SAT_GRID_MM) ||
+    greedyWarmStart(items, modelTrailer, allowRotate);
+  const upperBound = warmStart ? warmStart.count : greedyUpperBound(items, modelTrailer, allowRotate);
   if (!upperBound) throw new Error("Co najmniej jedna paleta nie miesci sie na naczepie w zadnej orientacji.");
 
   progress(requestId, "cpsatRange", { count: items.length, lower: lowerBound, upper: upperBound });
@@ -990,17 +1087,15 @@ function solveCpSatLayout(solver, payload, requestId) {
   const rot = [];
   const packLength = [];
   const packWidth = [];
-  const actualLength = [];
-  const actualWidth = [];
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const orientations = getOrientations(item, trailer, allowRotate);
+    const orientations = getOrientations(item, modelTrailer, allowRotate);
     if (orientations.length === 0) {
       throw new Error(`${item.name} jest wieksza niz naczepa.`);
     }
-    x[i] = model.newIntVar(0, trailer.length, `x_${i}`);
-    y[i] = model.newIntVar(0, trailer.width, `y_${i}`);
+    x[i] = model.newIntVar(0, modelTrailer.length, `x_${i}`);
+    y[i] = model.newIntVar(0, modelTrailer.width, `y_${i}`);
     const canRotate = orientations.some((orient) => orient.rotated);
     rot[i] = canRotate ? model.newBoolVar(`rot_${i}`) : null;
     if (!canRotate && allowRotate && item.length !== item.width) {
@@ -1011,10 +1106,8 @@ function solveCpSatLayout(solver, payload, requestId) {
     }
     packLength[i] = buildPackLengthExpr(item, rot[i]);
     packWidth[i] = buildPackWidthExpr(item, rot[i]);
-    actualLength[i] = rot[i] ? rot[i].times(item.width - item.length).plus(item.length) : item.length;
-    actualWidth[i] = rot[i] ? rot[i].times(item.length - item.width).plus(item.width) : item.width;
-    xEnd[i] = model.newIntVar(0, trailer.length, `x_end_${i}`);
-    yEnd[i] = model.newIntVar(0, trailer.width, `y_end_${i}`);
+    xEnd[i] = model.newIntVar(0, modelTrailer.length, `x_end_${i}`);
+    yEnd[i] = model.newIntVar(0, modelTrailer.width, `y_end_${i}`);
     model.add(xEnd[i].equals(x[i].plus(packLength[i])));
     model.add(yEnd[i].equals(y[i].plus(packWidth[i])));
   }
@@ -1027,12 +1120,12 @@ function solveCpSatLayout(solver, payload, requestId) {
   const yIntervalsByBin = [];
   for (let k = 0; k < upperBound; k++) {
     used[k] = model.newBoolVar(`used_${k}`);
-    usedLength[k] = model.newIntVar(0, trailer.length, `used_len_${k}`);
-    usedWidth[k] = model.newIntVar(0, trailer.width, `used_wid_${k}`);
+    usedLength[k] = model.newIntVar(0, modelTrailer.length, `used_len_${k}`);
+    usedWidth[k] = model.newIntVar(0, modelTrailer.width, `used_wid_${k}`);
     xIntervalsByBin[k] = [];
     yIntervalsByBin[k] = [];
-    model.add(usedLength[k].le(used[k].times(trailer.length)));
-    model.add(usedWidth[k].le(used[k].times(trailer.width)));
+    model.add(usedLength[k].le(used[k].times(modelTrailer.length)));
+    model.add(usedWidth[k].le(used[k].times(modelTrailer.width)));
     if (k > 0) model.add(used[k].le(used[k - 1]));
   }
 
@@ -1107,11 +1200,11 @@ function solveCpSatLayout(solver, payload, requestId) {
   const maxXWeight = variantPositionWeights.reduce((max, weight) => Math.max(max, weight.x), 0);
   const maxYWeight = variantPositionWeights.reduce((max, weight) => Math.max(max, weight.y), 0);
   const compactBound =
-    items.length * (trailer.length * maxXWeight + trailer.width * maxYWeight) +
-    upperBound * trailer.width +
+    items.length * (modelTrailer.length * maxXWeight + modelTrailer.width * maxYWeight) +
+    upperBound * modelTrailer.width +
     1;
   const lengthWeight = compactBound + 1;
-  const trailerWeight = upperBound * trailer.length * lengthWeight + compactBound + 1;
+  const trailerWeight = upperBound * modelTrailer.length * lengthWeight + compactBound + 1;
   const objectiveTerms = [
     ...used.map((varItem) => varItem.times(trailerWeight)),
     ...usedLength.map((varItem) => varItem.times(lengthWeight)),
@@ -1141,25 +1234,26 @@ function solveCpSatLayout(solver, payload, requestId) {
     for (let i = 0; i < items.length; i++) {
       if (result.value(assign[i][k]) !== 1) continue;
       const item = items[i];
+      const source = item.sourceItem || item;
       const rotated = rot[i] ? result.value(rot[i]) === 1 : false;
-      const packL = rotated ? item.packWidth : item.packLength;
-      const packW = rotated ? item.packLength : item.packWidth;
-      const actualL = rotated ? item.width : item.length;
-      const actualW = rotated ? item.length : item.width;
+      const packL = rotated ? source.packWidth : source.packLength;
+      const packW = rotated ? source.packLength : source.packWidth;
+      const actualL = rotated ? source.width : source.length;
+      const actualW = rotated ? source.length : source.width;
       const placedItem = {
-        id: item.id,
-        rowId: item.rowId,
-        itemIndex: item.itemIndex,
-        name: item.name,
-        color: item.color,
-        x: result.value(x[i]),
-        y: result.value(y[i]),
+        id: source.id,
+        rowId: source.rowId,
+        itemIndex: source.itemIndex,
+        name: source.name,
+        color: source.color,
+        x: toMillimeters(result.value(x[i])),
+        y: toMillimeters(result.value(y[i])),
         packLength: packL,
         packWidth: packW,
         length: actualL,
         width: actualW,
-        originalLength: item.length,
-        originalWidth: item.width,
+        originalLength: source.length,
+        originalWidth: source.width,
         rotated,
         area: actualL * actualW,
         trailerIndex: trailers.length + 1
@@ -1178,7 +1272,7 @@ function solveCpSatLayout(solver, payload, requestId) {
       trailer,
       trailerIndex,
       strategyLabel,
-      "WASM CP-SAT NoOverlap2D + dynamic rows/max-rects"
+      "WASM CP-SAT NoOverlap2D cm-grid + dynamic rows/max-rects"
     );
     trailers.push(trailerSummary);
     placed.push(...trailerSummary.placed);
@@ -1188,6 +1282,7 @@ function solveCpSatLayout(solver, payload, requestId) {
   const totalUsedLength = trailers.reduce((sum, trailerPlan) => sum + trailerPlan.usedLength, 0);
   const trailerArea = trailer.length * trailer.width;
   const trailerCount = trailers.length;
+  assertValidPlanGeometry(placed, trailer, expandedItems.length);
 
   return {
     placed,
@@ -1205,9 +1300,9 @@ function solveCpSatLayout(solver, payload, requestId) {
     fill: trailerCount > 0 ? placedArea / (trailerArea * trailerCount) : 0,
     freeArea: Math.max(0, trailerArea * trailerCount - placedArea),
     strategyLabel: result.status === CpSolverStatus.OPTIMAL
-      ? "OR-Tools CP-SAT exact + repack"
-      : "OR-Tools CP-SAT feasible + repack",
-    method: "WASM CP-SAT NoOverlap2D + dynamic rows/max-rects",
+      ? "OR-Tools CP-SAT exact + cm-grid repack"
+      : "OR-Tools CP-SAT feasible + cm-grid repack",
+    method: "WASM CP-SAT NoOverlap2D cm-grid + dynamic rows/max-rects",
     candidateCount: model.toProto().constraints.length,
     variantCount: model.toProto().variables.length,
     layoutVariant,
