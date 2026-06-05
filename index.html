@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.4</title>
+  <title>LoadPallet v1.5</title>
   <style>
     :root {
       color-scheme: light;
@@ -1098,7 +1098,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.4</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.5</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1288,8 +1288,8 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.12";
-    const APP_DISPLAY_VERSION = "v1.4";
+    const APP_VERSION = "2026-06-05.13";
+    const APP_DISPLAY_VERSION = "v1.5";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -5304,6 +5304,40 @@
         };
         const chooseBestValidPlan = (plans) =>
           chooseBestFinalPlan(plans.map(validPlan).filter(Boolean), trailer);
+        const planMatchesCurrentInput = (candidate) => {
+          if (!candidate) return false;
+          if (candidate.trailer?.length !== trailer.length || candidate.trailer?.width !== trailer.width) return false;
+          if (candidate.gap !== state.gap || candidate.allowRotate !== state.allowRotate) return false;
+          const allPlanItems = [
+            ...(Array.isArray(candidate.placed) ? candidate.placed : []),
+            ...(Array.isArray(candidate.unplaced) ? candidate.unplaced : [])
+          ];
+          if (allPlanItems.length !== items.length) return false;
+          const expected = new Map(state.rows.map((row) => [row.id, {
+            count: Math.floor(clampNumber(row.quantity, 0, 0)),
+            length: clampNumber(row.length, 1, 1),
+            width: clampNumber(row.width, 1, 1)
+          }]));
+          const seen = new Map();
+          for (const item of allPlanItems) {
+            const row = expected.get(item.rowId);
+            if (!row) return false;
+            const itemLength = clampNumber(item.originalLength ?? item.length, 1, 1);
+            const itemWidth = clampNumber(item.originalWidth ?? item.width, 1, 1);
+            if (itemLength !== row.length || itemWidth !== row.width) return false;
+            seen.set(item.rowId, (seen.get(item.rowId) || 0) + 1);
+          }
+          for (const [rowId, row] of expected) {
+            if ((seen.get(rowId) || 0) !== row.count) return false;
+          }
+          return true;
+        };
+        const reusableCurrentPlan = planMatchesCurrentInput(currentPlan) && validPlan(currentPlan)
+          ? currentPlan
+          : null;
+        if (pendingCalculation && reusableCurrentPlan) {
+          pendingCalculation.bestPlan = reusableCurrentPlan;
+        }
         const bestKnownPlan = (...plans) =>
           chooseBestValidPlan([
             pendingCalculation?.bestPlan,
@@ -5355,11 +5389,13 @@
               pendingCalculation.baselinePlan = baselinePlan;
               pendingCalculation.bestPlan = chooseBestValidPlan([
                 pendingCalculation.bestPlan,
-                baselinePlan
+                baselinePlan,
+                reusableCurrentPlan
               ].filter(Boolean));
             }
-            renderInterimPlan(baselinePlan);
-            setCalculating(true, t("optimalBaseReady", { best: planProgressSummary(baselinePlan) }), {
+            const bestAfterBaseline = bestKnownPlan(baselinePlan);
+            renderInterimPlan(bestAfterBaseline);
+            setCalculating(true, t("optimalBaseReady", { best: planProgressSummary(bestAfterBaseline) }), {
               budgetMs: config.budgetMs
             });
           } catch (error) {
@@ -5451,7 +5487,8 @@
           plan = chooseBestValidPlan([
             pendingCalculation?.bestPlan,
             plan,
-            baselinePlan
+            baselinePlan,
+            reusableCurrentPlan
           ].filter(Boolean)) || validPlan(plan) || validPlan(baselinePlan);
           if (!plan) {
             plan = await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
@@ -5481,7 +5518,8 @@
           console.warn("Final layout failed geometry validation.", planGeometryErrors(plan, trailer, items.length), plan);
           const fallbackPlan = chooseBestValidPlan([
             pendingCalculation?.bestPlan,
-            baselinePlan
+            baselinePlan,
+            reusableCurrentPlan
           ].filter(Boolean)) || await findMultiTrailerPlan(items, trailer, state.allowRotate, state.compactLength, {
             searchQuality: quality,
             layoutVariant: state.layoutVariant,
