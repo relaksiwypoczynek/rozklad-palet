@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.0</title>
+  <title>LoadPallet v1.1</title>
   <style>
     :root {
       color-scheme: light;
@@ -1098,7 +1098,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.0</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.1</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1288,8 +1288,8 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.08";
-    const APP_DISPLAY_VERSION = "v1.0";
+    const APP_VERSION = "2026-06-05.09";
+    const APP_DISPLAY_VERSION = "v1.1";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1358,6 +1358,7 @@
         method: "metoda",
         calculation: "liczenie",
         tractorTop: "ciągnik u góry",
+        freeAtDoors: ({ space }) => `Wolne ${space}`,
         trailerLabel: "Naczepa",
         position: "Pozycja",
         dimension: "Wymiar",
@@ -1472,6 +1473,7 @@
         method: "method",
         calculation: "calculation",
         tractorTop: "tractor at top",
+        freeAtDoors: ({ space }) => `Free ${space}`,
         trailerLabel: "Trailer",
         position: "Position",
         dimension: "Dimension",
@@ -1586,6 +1588,7 @@
         method: "methode",
         calculation: "berekening",
         tractorTop: "trekker boven",
+        freeAtDoors: ({ space }) => `Vrij ${space}`,
         trailerLabel: "Oplegger",
         position: "Positie",
         dimension: "Afmeting",
@@ -5545,9 +5548,11 @@
         drawGrid(ctx, layout);
         drawLabels(ctx, layout, visualTrailers.length);
 
-        for (const pallet of plan.placed.filter((item) => item.trailerIndex === trailerPlan.index)) {
+        const placedItems = trailerPlacedItems(plan, trailerPlan.index);
+        for (const pallet of placedItems) {
           drawPallet(ctx, pallet, layout, pallet.id === hoveredId);
         }
+        drawDoorFreeSpaceLabel(ctx, layout, placedItems);
       }
       ctx.restore();
       drawState = { layouts, trailer, width, height, plan };
@@ -5591,6 +5596,71 @@
       ctx.fillStyle = "#64748b";
       ctx.font = "11px Segoe UI, Arial, sans-serif";
       ctx.fillText(t("tractorTop"), ox + deckW / 2, oy - 3);
+      ctx.restore();
+    }
+
+    function trailerPlacedItems(plan, trailerIndex) {
+      return (plan.placed || []).filter((item) => Math.floor(item.trailerIndex || 1) === trailerIndex);
+    }
+
+    function freeDoorLengthMm(items, trailerLength) {
+      if (!items.length) return 0;
+      const usedEnd = items.reduce((max, item) =>
+        Math.max(max, Number(item.x || 0) + Number(item.length || item.packLength || 0)), 0);
+      return Math.max(0, trailerLength - usedEnd);
+    }
+
+    function formatFreeLength(mm) {
+      if (mm < 1000) return `${formatInt(Math.round(mm / 10))} cm`;
+      return `${formatDecimal(mm / 1000, 2)} m`;
+    }
+
+    function addRoundedRectPath(ctx, x, y, width, height, radius) {
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(x, y, width, height, radius);
+        return;
+      }
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+
+    function drawDoorFreeSpaceLabel(ctx, layout, placedItems) {
+      const freeMm = freeDoorLengthMm(placedItems, layout.trailer.length);
+      if (freeMm < 800) return;
+
+      const { ox, oy, deckW, deckH, scale } = layout;
+      const freePx = freeMm * scale;
+      const label = t("freeAtDoors", { space: formatFreeLength(freeMm) });
+      const labelX = ox + deckW / 2;
+      const labelY = oy + deckH - Math.min(Math.max(freePx / 2, 18), 32);
+
+      ctx.save();
+      ctx.font = "700 11px Segoe UI, Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const textWidth = ctx.measureText(label).width;
+      const badgeW = Math.min(deckW - 12, Math.max(74, textWidth + 18));
+      const badgeH = 22;
+      const badgeX = labelX - badgeW / 2;
+      const badgeY = Math.max(oy + 6, Math.min(labelY - badgeH / 2, oy + deckH - badgeH - 8));
+
+      ctx.fillStyle = "rgba(255,255,255,0.92)";
+      ctx.strokeStyle = "#0f766e";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      addRoundedRectPath(ctx, badgeX, badgeY, badgeW, badgeH, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#0f766e";
+      ctx.fillText(label, labelX, badgeY + badgeH / 2);
       ctx.restore();
     }
 
