@@ -1276,7 +1276,7 @@
 
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
-    const APP_VERSION = "2026-06-05.04";
+    const APP_VERSION = "2026-06-05.05";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1757,6 +1757,7 @@
     let isCalculating = false;
     let hasCalculated = false;
     let calculationToken = 0;
+    let pendingCalculation = null;
     let activeSolverWorker = null;
     let activeSolverReject = null;
     let activePreviewWorker = null;
@@ -2297,8 +2298,35 @@
       }
     }
 
+    function commitStoppedCalculation(context) {
+      if (!context || !context.bestPlan) return false;
+      const plan = {
+        ...context.bestPlan,
+        trailer: context.trailer,
+        totalItems: context.items.length,
+        gap: state.gap,
+        allowRotate: state.allowRotate,
+        searchQuality: "deep",
+        searchElapsedMs: nowMs() - context.startedAt,
+        autoSearch: false,
+        stopped: true
+      };
+      currentPlan = plan;
+      updateMetrics(currentPlan);
+      renderLegend(currentPlan);
+      renderIssues(buildIssues(currentPlan, context.items, context.trailer));
+      drawDeck(currentPlan);
+      saveState();
+      hasCalculated = true;
+      updateRecalcLabel();
+      return true;
+    }
+
     function cancelCalculation() {
       if (!isCalculating) return;
+      const context = pendingCalculation;
+      const keptPlan = commitStoppedCalculation(context);
+      pendingCalculation = null;
       calculationToken++;
       abortActiveSolver("Calculation stopped by user");
       stopCalculationPreview();
@@ -5107,6 +5135,14 @@
         const startedAt = nowMs();
         const deadline = startedAt + config.budgetMs;
         const seed = inputSeed(items, trailer, state.gap, state.allowRotate);
+        pendingCalculation = {
+          token,
+          trailer,
+          items,
+          startedAt,
+          baselinePlan: null,
+          bestPlan: null
+        };
         const solverPayload = {
           rows: state.rows,
           trailer,
@@ -5123,6 +5159,12 @@
         let baselinePlan = null;
         const renderInterimPlan = (candidate) => {
           if (!candidate || token !== calculationToken) return;
+          if (pendingCalculation && pendingCalculation.token === token) {
+            pendingCalculation.bestPlan = chooseBestFinalPlan([
+              pendingCalculation.bestPlan,
+              candidate
+            ].filter(Boolean), trailer);
+          }
           const previewPlan = {
             ...candidate,
             trailer,
@@ -5153,12 +5195,18 @@
               searchQuality: "deep",
               optimalSource: "fast-baseline"
             };
+            if (pendingCalculation && pendingCalculation.token === token) {
+              pendingCalculation.baselinePlan = baselinePlan;
+              pendingCalculation.bestPlan = chooseBestFinalPlan([
+                pendingCalculation.bestPlan,
+                baselinePlan
+              ].filter(Boolean), trailer);
+            }
             renderInterimPlan(baselinePlan);
           } catch (error) {
             if (isAbortError(error) || token !== calculationToken) return currentPlan;
             console.warn("Fast baseline unavailable.", error);
           }
-          startCalculationPreview({ token, items, trailer, seed });
         }
 
         try {
@@ -5200,6 +5248,12 @@
           }
           plan.searchQuality = "deep";
         }
+        if (pendingCalculation && pendingCalculation.token === token) {
+          pendingCalculation.bestPlan = chooseBestFinalPlan([
+            pendingCalculation.bestPlan,
+            plan
+          ].filter(Boolean), trailer);
+        }
         currentPlan = {
           ...plan,
           trailer,
@@ -5217,9 +5271,15 @@
         saveState();
         hasCalculated = true;
         updateRecalcLabel();
+        if (pendingCalculation && pendingCalculation.token === token) {
+          pendingCalculation = null;
+        }
         return currentPlan;
       } finally {
-        if (token === calculationToken) setCalculating(false);
+        if (token === calculationToken) {
+          pendingCalculation = null;
+          setCalculating(false);
+        }
       }
     }
 
