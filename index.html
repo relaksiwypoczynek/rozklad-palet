@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.7</title>
+  <title>LoadPallet v1.7.1</title>
   <link rel="icon" href="data:,">
   <style>
     :root {
@@ -1219,7 +1219,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.7</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.7.1</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1434,7 +1434,7 @@
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
     const APP_VERSION = "2026-06-05.14";
-    const APP_DISPLAY_VERSION = "v1.7";
+    const APP_DISPLAY_VERSION = "v1.7.1";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -7152,24 +7152,31 @@
       if (!pallet) return;
       if (layoutCtx.layout.kind === "unplaced") {
         const side = layoutCtx.layout.side;
-        const preSnapGhostY = snapToGrid5(layoutCtx.widthPos - pallet.width / 2);
-        const preSnapEnd = preSnapGhostY + pallet.packWidth;
-        let grew = false;
-        while (preSnapEnd > currentPlan.unplacedZoneWidth[side]) {
-          currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
-          grew = true;
-        }
-        if (grew) {
-          rebuildDrawStateLayouts(currentPlan);
-          const freshCtx = getLayoutAtPoint(px, py);
-          if (!freshCtx) {
-            editor.drag.dropState = "outOfCanvas";
-            editor.drag.valid = false;
-            editor.snapState = null;
-            drawDeck(currentPlan);
-            return;
+        // v1.7.1: grow only when this unplaced zone is the actual drop target.
+        // Same-zone grow is allowed on the right zone; the left zone would grow inward
+        // and push trailers away while the user drags back toward the trailer.
+        const wouldDropHere = editor.drag.sourceKind === "placed"
+          || (editor.drag.sourceKind === "unplaced" && editor.drag.sourceLayoutKey === layoutCtx.layout.key && side === "right");
+        if (wouldDropHere) {
+          const preSnapGhostY = snapToGrid5(layoutCtx.widthPos - pallet.width / 2);
+          const preSnapEnd = preSnapGhostY + pallet.packWidth;
+          let grew = false;
+          while (preSnapEnd > currentPlan.unplacedZoneWidth[side]) {
+            currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
+            grew = true;
           }
-          layoutCtx = freshCtx;
+          if (grew) {
+            rebuildDrawStateLayouts(currentPlan);
+            const freshCtx = getLayoutAtPoint(px, py);
+            if (!freshCtx) {
+              editor.drag.dropState = "outOfCanvas";
+              editor.drag.valid = false;
+              editor.snapState = null;
+              drawDeck(currentPlan);
+              return;
+            }
+            layoutCtx = freshCtx;
+          }
         }
       }
       const rawX = snapToGrid5(layoutCtx.lengthPos - pallet.length / 2);
@@ -7186,15 +7193,32 @@
       }
       if (layoutCtx.layout.kind === "unplaced") {
         const side = layoutCtx.layout.side;
-        let grewPost = false;
-        while (snappedY + pallet.packWidth > currentPlan.unplacedZoneWidth[side]) {
-          currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
-          grewPost = true;
-        }
-        if (grewPost) {
-          rebuildDrawStateLayouts(currentPlan);
-          const freshCtx = getLayoutAtPoint(px, py);
-          if (freshCtx) layoutCtx = freshCtx;
+        const wouldDropHerePost = editor.drag.sourceKind === "placed"
+          || (editor.drag.sourceKind === "unplaced" && editor.drag.sourceLayoutKey === layoutCtx.layout.key && side === "right");
+        if (wouldDropHerePost) {
+          let grewPost = false;
+          while (snappedY + pallet.packWidth > currentPlan.unplacedZoneWidth[side]) {
+            currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
+            grewPost = true;
+          }
+          if (grewPost) {
+            rebuildDrawStateLayouts(currentPlan);
+            const freshCtx = getLayoutAtPoint(px, py);
+            if (freshCtx) {
+              layoutCtx = freshCtx;
+              const newRawX = snapToGrid5(layoutCtx.lengthPos - pallet.length / 2);
+              const newRawY = snapToGrid5(layoutCtx.widthPos - pallet.width / 2);
+              if (!editor.drag.firstFrameRaw) {
+                const newSnap = applyLiveSnap({ x: newRawX, y: newRawY, length: pallet.length, width: pallet.width, packLength: pallet.packLength, packWidth: pallet.packWidth }, currentPlan, layoutCtx, pallet.id);
+                snappedX = newSnap.x;
+                snappedY = newSnap.y;
+                snapInfo = newSnap.snapInfo;
+              } else {
+                snappedX = newRawX;
+                snappedY = newRawY;
+              }
+            }
+          }
         }
       }
       editor.drag.currentX = snappedX;
