@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.6.1</title>
+  <title>LoadPallet v1.7</title>
+  <link rel="icon" href="data:,">
   <style>
     :root {
       color-scheme: light;
@@ -973,49 +974,6 @@
       background: #475569;
     }
 
-    .buffer-shell {
-      margin-top: 12px;
-      padding: 10px;
-      background: #f1f5f9;
-      border-radius: 10px;
-      border: 1px dashed #94a3b8;
-    }
-
-    .buffer-header {
-      font-size: 12px;
-      color: #475569;
-      margin-bottom: 6px;
-      font-weight: 700;
-    }
-
-    .buffer-chips {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .buffer-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 800;
-      cursor: grab;
-      touch-action: none;
-      user-select: none;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
-    }
-
-    .buffer-chip:active {
-      cursor: grabbing;
-    }
-
-    .buffer-chip.dragging {
-      opacity: 0.5;
-    }
-
     body.is-calculating .calc-overlay {
       display: flex;
     }
@@ -1261,7 +1219,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.6.1</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.7</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1448,7 +1406,6 @@
                 <span id="editorPalletLock" class="editor-lock" hidden>Zablokowana</span>
               </div>
               <div class="editor-actions">
-                <button id="editorMove" class="editor-action" type="button">Przesuń</button>
                 <button id="editorRotate" class="editor-action" type="button">Obróć</button>
                 <button id="editorLock" class="editor-action editor-action-secondary" type="button">Zablokuj</button>
                 <button id="editorRemove" class="editor-action editor-action-danger" type="button">Usuń</button>
@@ -1458,11 +1415,6 @@
           </div>
           <div id="tooltip" class="tooltip"></div>
         </div>
-        <div id="bufferShell" class="buffer-shell" hidden>
-          <div class="buffer-header">Odłożone palety (przeciągnij na naczepę)</div>
-          <div id="bufferChips" class="buffer-chips"></div>
-        </div>
-
         <div class="below-stage">
           <div class="result-box">
             <h3>Legenda</h3>
@@ -1482,7 +1434,7 @@
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
     const APP_VERSION = "2026-06-05.14";
-    const APP_DISPLAY_VERSION = "v1.6.1";
+    const APP_DISPLAY_VERSION = "v1.7";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -1542,6 +1494,15 @@
         customPallet: "Nietypowa / własna",
         customName: "Własna",
         delete: "Usuń",
+        editorRotate: "Obróć",
+        editorLock: "Zablokuj",
+        editorUnlock: "Odblokuj",
+        editorRemove: "Usuń",
+        editorDone: "Zakończ",
+        editorLocked: "Zablokowana",
+        unplacedLeft: "Odłożone (lewa)",
+        unplacedRight: "Odłożone (prawa)",
+        rotateNoRoom: "Brak miejsca na obrót w tej pozycji",
         noPalletsInPlan: "Brak palet w planie.",
         allPlaced: "Wszystko ułożone",
         hasUnplaced: "Są nieułożone palety",
@@ -1665,6 +1626,15 @@
         customPallet: "Custom / non-standard",
         customName: "Custom",
         delete: "Delete",
+        editorRotate: "Rotate",
+        editorLock: "Lock",
+        editorUnlock: "Unlock",
+        editorRemove: "Remove",
+        editorDone: "Done",
+        editorLocked: "Locked",
+        unplacedLeft: "Unplaced (left)",
+        unplacedRight: "Unplaced (right)",
+        rotateNoRoom: "No room to rotate in this position",
         noPalletsInPlan: "No pallets in the plan.",
         allPlaced: "Everything placed",
         hasUnplaced: "Some pallets are unplaced",
@@ -1788,6 +1758,15 @@
         customPallet: "Afwijkend / eigen",
         customName: "Eigen",
         delete: "Verwijderen",
+        editorRotate: "Draaien",
+        editorLock: "Vergrendelen",
+        editorUnlock: "Ontgrendelen",
+        editorRemove: "Verwijderen",
+        editorDone: "Klaar",
+        editorLocked: "Vergrendeld",
+        unplacedLeft: "Niet geplaatst (links)",
+        unplacedRight: "Niet geplaatst (rechts)",
+        rotateNoRoom: "Geen ruimte om op deze positie te draaien",
         noPalletsInPlan: "Geen pallets in het plan.",
         allPlaced: "Alles geplaatst",
         hasUnplaced: "Er zijn niet-geplaatste pallets",
@@ -1988,13 +1967,10 @@
       editorPalletName: document.getElementById("editorPalletName"),
       editorPalletPos: document.getElementById("editorPalletPos"),
       editorPalletLock: document.getElementById("editorPalletLock"),
-      editorMove: document.getElementById("editorMove"),
       editorRotate: document.getElementById("editorRotate"),
       editorLock: document.getElementById("editorLock"),
       editorRemove: document.getElementById("editorRemove"),
       editorClose: document.getElementById("editorClose"),
-      bufferShell: document.getElementById("bufferShell"),
-      bufferChips: document.getElementById("bufferChips"),
       tooltip: document.getElementById("tooltip"),
       placedMetric: document.getElementById("placedMetric"),
       fillMetric: document.getElementById("fillMetric"),
@@ -2028,10 +2004,18 @@
       selectedId: null,
       mode: "idle",
       drag: null,
-      placing: null,
       movePointerId: null,
-      placingPointerId: null
+      pressOrigin: null,
+      snapState: null
     };
+
+    const DRAG_LIFT_THRESHOLD_PX = 5;
+    const SNAP_RADIUS_MM = 50;
+    const SNAP_HYSTERESIS_MM = 15;
+    const UNPLACED_ZONE_INITIAL_MM = 1500;
+    const UNPLACED_ZONE_GROW_STEP_MM = 500;
+    const ZONE_GAP_PX = 60;
+    const TRAILER_GAP_PX = 32;
 
     function numberValue(value, fallback = 0) {
       const parsed = Number(value);
@@ -2249,6 +2233,10 @@
       setText('label[for="newPalletPreset"]', t("size"));
       setText('label[for="newPalletQty"]', t("quantity"));
       el.addLoad.textContent = t("add");
+      el.editorRotate.textContent = t("editorRotate");
+      el.editorRemove.textContent = t("editorRemove");
+      el.editorClose.textContent = t("editorDone");
+      el.editorPalletLock.textContent = t("editorLocked");
       setText('label[for="customPalletLength"]', t("length"));
       setText('label[for="customPalletWidth"]', t("width"));
       setText('label[for="customPalletName"]', t("name"));
@@ -2617,6 +2605,7 @@
 
     function commitStoppedCalculation(context) {
       if (!context || !context.bestPlan) return false;
+      const previous = collectPreviousUnplacedManualState(currentPlan);
       const plan = {
         ...context.bestPlan,
         trailer: context.trailer,
@@ -2629,17 +2618,17 @@
         stopped: true
       };
       currentPlan = plan;
+      applyPreviousUnplacedManualState(currentPlan, previous.previousPositions, previous.previousZoneWidth);
       updateMetrics(currentPlan);
       renderLegend(currentPlan);
       renderIssues(buildIssues(currentPlan, context.items, context.trailer));
-      if (editor.selectedId && !currentPlan.placed.find((pallet) => pallet.id === editor.selectedId)) {
+      if (editor.selectedId && !findEditablePallet(editor.selectedId)) {
         editor.selectedId = null;
         editor.mode = "idle";
         hideEditorOverlay();
         hideTooltipIfVisible();
       }
       drawDeck(currentPlan);
-      renderBuffer(currentPlan);
       saveState();
       hasCalculated = true;
       updateRecalcLabel();
@@ -2766,7 +2755,6 @@
           renderLegend(previewPlan);
           renderIssues(buildIssues(previewPlan, items, trailer));
           drawDeck(previewPlan);
-          renderBuffer(previewPlan);
         } catch (error) {
           if (isAbortError(error)) return;
           console.warn("Preview layout unavailable.", error);
@@ -5515,6 +5503,7 @@
       const quality = options.auto ? "fast" : state.searchQuality;
       const config = searchQualityConfig(quality);
       const qualityForStatus = options.auto ? t("quickCalc") : qualityLabel(quality).toLowerCase();
+      const previous = collectPreviousUnplacedManualState(currentPlan);
       setCalculating(true, `${t("calculating")} (${qualityForStatus})`, {
         budgetMs: config.budgetMs,
         overallBudgetMs: config.budgetMs,
@@ -5628,17 +5617,19 @@
             searchQuality: "deep",
             autoSearch: false
           };
+          applyPreviousUnplacedManualState(previewPlan, previous.previousPositions, previous.previousZoneWidth);
           updateMetrics(previewPlan);
           renderLegend(previewPlan);
           renderIssues(buildIssues(previewPlan, items, trailer));
-          if (editor.selectedId && !previewPlan.placed.find((pallet) => pallet.id === editor.selectedId)) {
+          if (editor.selectedId &&
+              !previewPlan.placed.find((pallet) => pallet.id === editor.selectedId) &&
+              !previewPlan.unplaced.find((pallet) => pallet.id === editor.selectedId)) {
             editor.selectedId = null;
             editor.mode = "idle";
             hideEditorOverlay();
             hideTooltipIfVisible();
           }
           drawDeck(previewPlan);
-          renderBuffer(previewPlan);
         };
 
         if (quality === "deep" && !options.auto) {
@@ -5811,18 +5802,18 @@
           searchElapsedMs: plan.searchElapsedMs || (nowMs() - startedAt),
           autoSearch: Boolean(options.auto)
         };
+        applyPreviousUnplacedManualState(currentPlan, previous.previousPositions, previous.previousZoneWidth);
 
         updateMetrics(currentPlan);
         renderLegend(currentPlan);
         renderIssues(buildIssues(currentPlan, items, trailer));
-        if (editor.selectedId && !currentPlan.placed.find((pallet) => pallet.id === editor.selectedId)) {
+        if (editor.selectedId && !findEditablePallet(editor.selectedId)) {
           editor.selectedId = null;
           editor.mode = "idle";
           hideEditorOverlay();
           hideTooltipIfVisible();
         }
         drawDeck(currentPlan);
-        renderBuffer(currentPlan);
         saveState();
         hasCalculated = true;
         updateRecalcLabel();
@@ -5884,11 +5875,12 @@
         .join("");
     }
 
-    function setupCanvasSize() {
+    function resizeDeckCanvas(cssWidth, cssHeight) {
       const dpr = window.devicePixelRatio || 1;
-      const rect = el.canvas.getBoundingClientRect();
-      const width = Math.max(320, Math.round(rect.width));
-      const height = Math.max(240, Math.round(rect.height));
+      const width = Math.max(320, Math.ceil(cssWidth));
+      const height = Math.max(240, Math.ceil(cssHeight));
+      el.canvas.style.width = `${width}px`;
+      el.canvas.style.height = `${height}px`;
       el.canvas.width = Math.round(width * dpr);
       el.canvas.height = Math.round(height * dpr);
       const ctx = el.canvas.getContext("2d");
@@ -5922,8 +5914,8 @@
     function trailerVisualMetrics(plan) {
       const shellWidth = Math.max(320, el.canvasShell.clientWidth || el.canvas.clientWidth || 900);
       const count = visualTrailerPlans(plan).length;
-      const gap = shellWidth < 760 ? 24 : 34;
-      const padX = shellWidth < 760 ? 16 : 28;
+      const gap = TRAILER_GAP_PX;
+      const padX = 40;
       const padY = 52;
       const maxTrailerWidth = shellWidth >= 760 ? 260 : 178;
       const deckW = Math.min(maxTrailerWidth, Math.max(152, shellWidth < 760 ? shellWidth * 0.42 : maxTrailerWidth));
@@ -5937,7 +5929,14 @@
     function setCanvasSizeForPlan(plan) {
       const previousScrollLeft = el.canvasShell.scrollLeft;
       const metrics = trailerVisualMetrics(plan);
-      const canvasWidth = Math.max(metrics.shellWidth, metrics.contentWidth);
+      const zoneWidth = plan.unplacedZoneWidth || { left: UNPLACED_ZONE_INITIAL_MM, right: UNPLACED_ZONE_INITIAL_MM };
+      const leftZonePx = zoneWidth.left * metrics.scale;
+      const rightZonePx = zoneWidth.right * metrics.scale;
+      const trailersTotalPx = metrics.count * metrics.deckW + (metrics.count - 1) * TRAILER_GAP_PX;
+      const canvasWidth = Math.max(
+        metrics.shellWidth,
+        Math.ceil(metrics.padX + leftZonePx + ZONE_GAP_PX + trailersTotalPx + ZONE_GAP_PX + rightZonePx + metrics.padX)
+      );
       const canvasHeight = Math.max(metrics.shellWidth < 760 ? 520 : 620, metrics.contentHeight);
       el.canvas.style.width = `${canvasWidth}px`;
       el.canvas.style.height = `${canvasHeight}px`;
@@ -5946,51 +5945,141 @@
 
     function drawDeck(plan) {
       displayedPlan = plan;
+      if (plan && plan.unplaced) {
+        const strictErrors = planUnplacedGeometryErrorsStrict(plan);
+        if (strictErrors.length > 0) {
+          console.error("drawDeck: plan ma uszkodzony kontrakt unplaced - nie normalizuje:", strictErrors);
+        } else {
+          const hasUnpositioned = plan.unplaced.some((p) => !p.offTrailerSide || !Number.isFinite(p.x) || !Number.isFinite(p.y));
+          const hasGeometryErrors = !hasUnpositioned && planUnplacedGeometryErrors(plan).length > 0;
+          if (hasUnpositioned || hasGeometryErrors) normalizePlanForCanvas(plan);
+        }
+      }
       setCanvasSizeForPlan(plan);
-      const { ctx, width, height } = setupCanvasSize();
+      const metrics = trailerVisualMetrics(plan);
+      if (!plan.unplacedZoneWidth) {
+        plan.unplacedZoneWidth = { left: UNPLACED_ZONE_INITIAL_MM, right: UNPLACED_ZONE_INITIAL_MM };
+      }
+      const trailerCount = visualTrailerPlans(plan).length;
+      const leftZonePx = plan.unplacedZoneWidth.left * metrics.scale;
+      const rightZonePx = plan.unplacedZoneWidth.right * metrics.scale;
+      const trailerStartX = metrics.padX + leftZonePx + ZONE_GAP_PX;
+      const trailersTotalPx = trailerCount * metrics.deckW + (trailerCount - 1) * TRAILER_GAP_PX;
+      const rightZoneStartX = trailerStartX + trailersTotalPx + ZONE_GAP_PX;
+      const totalCanvasWidth = Math.max(
+        metrics.shellWidth,
+        Math.ceil(rightZoneStartX + rightZonePx + metrics.padX)
+      );
+      const totalCanvasHeight = Math.max(metrics.shellWidth < 760 ? 520 : 620, metrics.contentHeight);
+      const { ctx, width, height } = resizeDeckCanvas(totalCanvasWidth, totalCanvasHeight);
       ctx.clearRect(0, 0, width, height);
 
       const trailer = plan.trailer;
       const visualTrailers = visualTrailerPlans(plan);
-      const metrics = trailerVisualMetrics(plan);
-      const startX = metrics.count === 1 ? Math.max(metrics.padX, (width - metrics.deckW) / 2) : metrics.padX;
-      const layouts = [];
-
-      ctx.save();
+      const layouts = [
+        {
+          kind: "unplaced",
+          side: "left",
+          key: "unplaced:left",
+          index: null,
+          ox: metrics.padX,
+          oy: metrics.padY,
+          scale: metrics.scale,
+          deckW: leftZonePx,
+          deckH: metrics.deckH,
+          length: trailer.length,
+          width: plan.unplacedZoneWidth.left
+        }
+      ];
       for (const trailerPlan of visualTrailers) {
         const position = trailerPlan.index - 1;
-        const ox = startX + position * (metrics.deckW + metrics.gap);
-        const oy = metrics.padY;
-        const layout = {
+        layouts.push({
+          kind: "trailer",
           index: trailerPlan.index,
-          ox,
-          oy,
+          key: `trailer:${trailerPlan.index}`,
+          ox: trailerStartX + position * (metrics.deckW + TRAILER_GAP_PX),
+          oy: metrics.padY,
           scale: metrics.scale,
           deckW: metrics.deckW,
           deckH: metrics.deckH,
           trailer,
-          width,
-          height
-        };
-        layouts.push(layout);
+          length: trailer.length,
+          width: trailer.width
+        });
+      }
+      layouts.push({
+        kind: "unplaced",
+        side: "right",
+        key: "unplaced:right",
+        index: null,
+        ox: rightZoneStartX,
+        oy: metrics.padY,
+        scale: metrics.scale,
+        deckW: rightZonePx,
+        deckH: metrics.deckH,
+        length: trailer.length,
+        width: plan.unplacedZoneWidth.right
+      });
+      drawState = { layouts, trailer, width, height, plan, scale: metrics.scale, cssHeight: totalCanvasHeight };
 
-        ctx.fillStyle = "#f8fafc";
-        ctx.strokeStyle = "#94a3b8";
-        ctx.lineWidth = 1.5;
-        ctx.fillRect(ox, oy, metrics.deckW, metrics.deckH);
-        ctx.strokeRect(ox, oy, metrics.deckW, metrics.deckH);
-        drawGrid(ctx, layout);
-        drawLabels(ctx, layout, visualTrailers.length);
+      ctx.save();
+      for (const layout of layouts) {
+        if (layout.kind === "trailer") drawTrailer(ctx, layout, plan, visualTrailers.length);
+        else if (layout.kind === "unplaced") drawUnplacedZone(ctx, layout, plan);
+      }
+      const renderables = [
+        ...(plan.placed || []).map((pallet) => ({ kind: "placed", pallet, layoutKey: `trailer:${pallet.trailerIndex}` })),
+        ...(plan.unplaced || [])
+          .filter((pallet) => pallet.offTrailerSide && Number.isFinite(pallet.x) && Number.isFinite(pallet.y) && Number.isFinite(pallet.packLength) && Number.isFinite(pallet.packWidth))
+          .map((pallet) => ({ kind: "unplaced", pallet, layoutKey: `unplaced:${pallet.offTrailerSide}` }))
+      ];
+      for (const renderable of renderables) {
+        const layout = layouts.find((item) => item.key === renderable.layoutKey);
+        if (layout) drawPallet(ctx, renderable.pallet, layout, renderable.pallet.id === hoveredId);
+      }
+      for (const layout of layouts.filter((item) => item.kind === "trailer")) {
+        drawDoorFreeSpaceLabel(ctx, layout, trailerPlacedItems(plan, layout.index));
+      }
+      drawMovingGhost(ctx, layouts, plan);
+      ctx.restore();
+    }
 
-        const placedItems = trailerPlacedItems(plan, trailerPlan.index);
-        for (const pallet of placedItems) {
-          drawPallet(ctx, pallet, layout, pallet.id === hoveredId);
-        }
-        drawDoorFreeSpaceLabel(ctx, layout, placedItems);
+    function drawTrailer(ctx, layout, plan, totalTrailers) {
+      ctx.save();
+      ctx.fillStyle = "#f8fafc";
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(layout.ox, layout.oy, layout.deckW, layout.deckH);
+      ctx.strokeRect(layout.ox, layout.oy, layout.deckW, layout.deckH);
+      drawGrid(ctx, layout);
+      drawLabels(ctx, layout, totalTrailers);
+      ctx.restore();
+    }
+
+    function drawUnplacedZone(ctx, layout, plan) {
+      ctx.save();
+      ctx.fillStyle = "#f1f5f9";
+      ctx.fillRect(layout.ox, layout.oy, layout.deckW, layout.deckH);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(layout.ox, layout.oy, layout.deckW, layout.deckH);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "11px Segoe UI, Arial, sans-serif";
+      ctx.textAlign = "center";
+      const label = layout.side === "left" ? t("unplacedLeft") : t("unplacedRight");
+      ctx.fillText(label, layout.ox + layout.deckW / 2, layout.oy - 6);
+      const itemsInZone = (plan.unplaced || []).filter((pallet) => pallet.offTrailerSide === layout.side);
+      if (itemsInZone.length === 0) {
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "italic 12px Segoe UI, Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Brak odłożonych palet", layout.ox + layout.deckW / 2, layout.oy + layout.deckH / 2);
+        ctx.textBaseline = "alphabetic";
       }
       ctx.restore();
-      drawEditorGhost(ctx, layouts, plan);
-      drawState = { layouts, trailer, width, height, plan };
     }
 
     function drawGrid(ctx, layout) {
@@ -6115,21 +6204,22 @@
     }
 
     function selectPalletById(id) {
-      if (!currentPlan?.placed?.some((pallet) => pallet.id === id)) return;
-      cleanupMoveDrag(false);
-      cleanupBufferDrag(false);
+      const pallet = findEditablePallet(id);
+      if (!pallet) return;
       editor.selectedId = id;
-      editor.mode = "idle";
+      editor.mode = "selected";
+      editor.snapState = null;
       hideTooltipIfVisible();
       showEditorOverlay();
       drawDeck(currentPlan);
     }
 
     function deselectPallet() {
-      cleanupMoveDrag(false);
-      cleanupBufferDrag(false);
+      cleanupMoveDrag();
       editor.selectedId = null;
       editor.mode = "idle";
+      editor.pressOrigin = null;
+      editor.snapState = null;
       hideTooltipIfVisible();
       hideEditorOverlay();
       document.body.style.cursor = "";
@@ -6137,22 +6227,20 @@
     }
 
     function showEditorOverlay() {
-      const pallet = currentPlan?.placed?.find((item) => item.id === editor.selectedId);
+      const pallet = findEditablePallet(editor.selectedId);
       if (!pallet) {
         hideEditorOverlay();
         return;
       }
       el.editorPalletName.textContent = pallet.name;
-      el.editorPalletPos.textContent = editor.mode === "armedForMove"
-        ? "Wciśnij paletę i przeciągnij"
-        : `Naczepa ${formatInt(pallet.trailerIndex || 1)} • ${formatInt(pallet.x || 0)}/${formatInt(pallet.y || 0)} mm • ${pallet.rotated ? "obrócona" : "baza"}`;
+      el.editorPalletPos.textContent = formatPositionLabel(pallet);
       el.editorPalletLock.hidden = !pallet.locked;
-      const inIdle = editor.mode === "idle";
-      el.editorMove.disabled = !!pallet.locked || !inIdle;
-      el.editorRotate.disabled = !!pallet.locked || !inIdle;
-      el.editorLock.disabled = !inIdle;
-      el.editorRemove.disabled = !!pallet.locked || !inIdle;
-      el.editorLock.textContent = pallet.locked ? "Odblokuj" : "Zablokuj";
+      const acceptsAction = (editor.mode === "idle" || editor.mode === "selected") && !pallet.locked;
+      el.editorRotate.disabled = !acceptsAction;
+      el.editorLock.disabled = !(editor.mode === "idle" || editor.mode === "selected");
+      el.editorRemove.disabled = !acceptsAction;
+      el.editorPalletLock.textContent = t("editorLocked");
+      el.editorLock.textContent = pallet.locked ? t("editorUnlock") : t("editorLock");
       el.editorOverlay.classList.add("visible");
       el.editorOverlay.setAttribute("aria-hidden", "false");
     }
@@ -6214,23 +6302,232 @@
       return Math.round(value / 5) * 5;
     }
 
-    function renderBuffer(plan) {
-      if (!plan || !Array.isArray(plan.unplaced) || plan.unplaced.length === 0) {
-        el.bufferShell.hidden = true;
-        el.bufferChips.innerHTML = "";
+    function rectsOverlap(x1, y1, w1, h1, x2, y2, w2, h2) {
+      return !(x1 + w1 <= x2 || x2 + w2 <= x1 || y1 + h1 <= y2 || y2 + h2 <= y1);
+    }
+
+    function normalizePlanForCanvas(plan) {
+      if (!plan || !plan.unplaced || !plan.trailer) return plan;
+      if (!plan.unplacedZoneWidth) {
+        plan.unplacedZoneWidth = { left: UNPLACED_ZONE_INITIAL_MM, right: UNPLACED_ZONE_INITIAL_MM };
+      }
+      const positioned = plan.unplaced.filter((p) => p.offTrailerSide && Number.isFinite(p.x) && Number.isFinite(p.y));
+      const needLayout = plan.unplaced.filter((p) => !p.offTrailerSide || !Number.isFinite(p.x) || !Number.isFinite(p.y));
+      const finalPositioned = [];
+      for (const pallet of positioned) {
+        const collision = finalPositioned.some((other) =>
+          other.offTrailerSide === pallet.offTrailerSide &&
+          rectsOverlap(pallet.x, pallet.y, pallet.packLength, pallet.packWidth, other.x, other.y, other.packLength, other.packWidth)
+        );
+        const zoneWidth = plan.unplacedZoneWidth[pallet.offTrailerSide] || UNPLACED_ZONE_INITIAL_MM;
+        const outOfBounds = pallet.x < 0 || pallet.y < 0 ||
+          pallet.x + pallet.packLength > plan.trailer.length ||
+          pallet.y + pallet.packWidth > zoneWidth;
+        if (collision || outOfBounds) {
+          pallet.offTrailerSide = null;
+          pallet.x = null;
+          pallet.y = null;
+          needLayout.push(pallet);
+        } else {
+          finalPositioned.push(pallet);
+        }
+      }
+      for (const item of needLayout) {
+        const placed = tryPlaceInZone(item, "right", finalPositioned, plan) ||
+          tryPlaceInZone(item, "left", finalPositioned, plan) ||
+          growAndPlace(item, finalPositioned, plan);
+        if (placed) finalPositioned.push(item);
+      }
+      return plan;
+    }
+
+    function tryPlaceInZone(item, side, finalPositioned, plan) {
+      const zoneWidth = plan.unplacedZoneWidth[side];
+      const zoneLength = plan.trailer.length;
+      const candidates = generateZoneCandidates(item, side, finalPositioned, zoneLength, zoneWidth);
+      candidates.sort((a, b) => a.x - b.x || a.y - b.y);
+      for (const candidate of candidates) {
+        if (candidate.x < 0 || candidate.y < 0) continue;
+        if (candidate.x + item.packLength > zoneLength || candidate.y + item.packWidth > zoneWidth) continue;
+        const collides = finalPositioned.some((other) =>
+          other.offTrailerSide === side &&
+          rectsOverlap(candidate.x, candidate.y, item.packLength, item.packWidth, other.x, other.y, other.packLength, other.packWidth)
+        );
+        if (!collides) {
+          item.offTrailerSide = side;
+          item.x = candidate.x;
+          item.y = candidate.y;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function generateZoneCandidates(item, side, finalPositioned, zoneLength, zoneWidth) {
+      const peers = finalPositioned.filter((p) => p.offTrailerSide === side);
+      const xValues = new Set([0]);
+      const yValues = new Set([0]);
+      for (const peer of peers) {
+        xValues.add(snapToGrid5(peer.x + peer.packLength));
+        xValues.add(snapToGrid5(peer.x - item.packLength));
+        yValues.add(snapToGrid5(peer.y + peer.packWidth));
+        yValues.add(snapToGrid5(peer.y - item.packWidth));
+      }
+      const candidates = [];
+      for (const x of xValues) {
+        if (!Number.isFinite(x) || x < 0 || x > zoneLength) continue;
+        for (const y of yValues) {
+          if (!Number.isFinite(y) || y < 0 || y > zoneWidth) continue;
+          candidates.push({ x, y });
+        }
+      }
+      const seen = new Set();
+      return candidates.filter((candidate) => {
+        const key = `${candidate.x}:${candidate.y}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function growAndPlace(item, finalPositioned, plan) {
+      const maxIterations = 50;
+      for (let i = 0; i < maxIterations; i++) {
+        plan.unplacedZoneWidth.right += UNPLACED_ZONE_GROW_STEP_MM;
+        if (tryPlaceInZone(item, "right", finalPositioned, plan)) return true;
+      }
+      for (let i = 0; i < maxIterations; i++) {
+        plan.unplacedZoneWidth.left += UNPLACED_ZONE_GROW_STEP_MM;
+        if (tryPlaceInZone(item, "left", finalPositioned, plan)) return true;
+      }
+      throw new Error(`normalizePlanForCanvas: no room for pallet ${item.id}`);
+    }
+
+    function rebuildDrawStateLayouts(plan) {
+      if (!plan || !plan.trailer || !drawState) return;
+      let scale = drawState.scale || drawState.layouts?.[0]?.scale;
+      if (!Number.isFinite(scale) || scale <= 0) {
+        console.warn("rebuildDrawStateLayouts: invalid scale");
+        drawDeck(plan);
         return;
       }
-      el.bufferShell.hidden = false;
-      el.bufferChips.innerHTML = "";
-      for (const item of plan.unplaced) {
-        const chip = document.createElement("div");
-        chip.className = "buffer-chip";
-        const color = item.color || "#cbd5e1";
-        chip.style.background = color;
-        chip.style.color = readableTextColor(color);
-        chip.dataset.bufferId = item.id;
-        chip.textContent = `${item.name} #${item.itemIndex || ""}`.trim();
-        el.bufferChips.appendChild(chip);
+      if (!plan.unplacedZoneWidth) {
+        plan.unplacedZoneWidth = { left: UNPLACED_ZONE_INITIAL_MM, right: UNPLACED_ZONE_INITIAL_MM };
+      }
+      const padBase = 40;
+      const trailerCount = visualTrailerCount(plan);
+      const trailerWidthPx = plan.trailer.width * scale;
+      const deckH = plan.trailer.length * scale;
+      const leftZonePx = plan.unplacedZoneWidth.left * scale;
+      const rightZonePx = plan.unplacedZoneWidth.right * scale;
+      const trailerStartX = padBase + leftZonePx + ZONE_GAP_PX;
+      const trailersTotalPx = trailerCount * trailerWidthPx + (trailerCount - 1) * TRAILER_GAP_PX;
+      const rightZoneStartX = trailerStartX + trailersTotalPx + ZONE_GAP_PX;
+      const totalCanvasWidth = rightZoneStartX + rightZonePx + padBase;
+      const oy = drawState.layouts?.[0]?.oy || 52;
+      const layouts = [{
+        kind: "unplaced",
+        side: "left",
+        key: "unplaced:left",
+        index: null,
+        ox: padBase,
+        oy,
+        scale,
+        deckW: leftZonePx,
+        deckH,
+        length: plan.trailer.length,
+        width: plan.unplacedZoneWidth.left
+      }];
+      for (let i = 0; i < trailerCount; i++) {
+        layouts.push({
+          kind: "trailer",
+          index: i + 1,
+          key: `trailer:${i + 1}`,
+          ox: trailerStartX + i * (trailerWidthPx + TRAILER_GAP_PX),
+          oy,
+          scale,
+          deckW: trailerWidthPx,
+          deckH,
+          trailer: plan.trailer,
+          length: plan.trailer.length,
+          width: plan.trailer.width
+        });
+      }
+      layouts.push({
+        kind: "unplaced",
+        side: "right",
+        key: "unplaced:right",
+        index: null,
+        ox: rightZoneStartX,
+        oy,
+        scale,
+        deckW: rightZonePx,
+        deckH,
+        length: plan.trailer.length,
+        width: plan.unplacedZoneWidth.right
+      });
+      drawState.layouts = layouts;
+      resizeDeckCanvas(totalCanvasWidth, drawState.cssHeight || (oy + deckH + padBase));
+    }
+
+    function getLayoutAtPoint(canvasX, canvasY) {
+      if (!drawState?.layouts) return null;
+      for (const layout of drawState.layouts) {
+        if (
+          canvasX >= layout.ox &&
+          canvasX <= layout.ox + layout.deckW &&
+          canvasY >= layout.oy &&
+          canvasY <= layout.oy + layout.deckH
+        ) {
+          return {
+            layout,
+            lengthPos: (canvasY - layout.oy) / layout.scale,
+            widthPos: (canvasX - layout.ox) / layout.scale
+          };
+        }
+      }
+      return null;
+    }
+
+    function findEditablePallet(id) {
+      if (!currentPlan || !id) return null;
+      return currentPlan.placed?.find((pallet) => pallet.id === id) ||
+        currentPlan.unplaced?.find((pallet) => pallet.id === id) ||
+        null;
+    }
+
+    function formatPositionLabel(pallet) {
+      if (pallet.trailerIndex && pallet.trailerIndex >= 1) {
+        return `${t("trailerLabel")} ${formatInt(pallet.trailerIndex)} • ${formatInt(pallet.x || 0)}/${formatInt(pallet.y || 0)} mm • ${pallet.rotated ? t("rotated") : t("base")}`;
+      }
+      if (pallet.offTrailerSide) {
+        const side = pallet.offTrailerSide === "left" ? t("unplacedLeft") : t("unplacedRight");
+        return `${side} • ${formatInt(pallet.x || 0)}/${formatInt(pallet.y || 0)} mm • ${pallet.rotated ? t("rotated") : t("base")}`;
+      }
+      return t("missing");
+    }
+
+    function deepClonePallets(arr) {
+      return (arr || []).map((pallet) => ({ ...pallet }));
+    }
+
+    function makeSnapshot(plan) {
+      return {
+        placed: deepClonePallets(plan.placed),
+        unplaced: deepClonePallets(plan.unplaced),
+        manuallyEdited: !!plan.manuallyEdited,
+        unplacedZoneWidth: plan.unplacedZoneWidth ? { ...plan.unplacedZoneWidth } : null
+      };
+    }
+
+    function restoreSnapshot(plan, snapshot) {
+      plan.placed = snapshot.placed;
+      plan.unplaced = snapshot.unplaced;
+      plan.manuallyEdited = snapshot.manuallyEdited;
+      if (snapshot.unplacedZoneWidth) {
+        plan.unplacedZoneWidth = { ...snapshot.unplacedZoneWidth };
+      } else {
+        delete plan.unplacedZoneWidth;
       }
     }
 
@@ -6303,12 +6600,13 @@
       return currentPlan;
     }
 
-    function buildUnplacedItemFromPallet(pallet, plan) {
-      const baseLength = pallet.originalLength || (pallet.rotated ? pallet.width : pallet.length);
-      const baseWidth = pallet.originalWidth || (pallet.rotated ? pallet.length : pallet.width);
-      const gap = plan.gap || 0;
-      const packLength = baseLength + gap;
-      const packWidth = baseWidth + gap;
+    function buildUnplacedItemFromPallet(pallet, plan, dropContext = null) {
+      const length = pallet.length;
+      const width = pallet.width;
+      const packLength = pallet.packLength;
+      const packWidth = pallet.packWidth;
+      const originalLength = pallet.originalLength || (pallet.rotated ? pallet.width : pallet.length);
+      const originalWidth = pallet.originalWidth || (pallet.rotated ? pallet.length : pallet.width);
       const typeIndex = state.rows.findIndex((row) => row.id === pallet.rowId);
       return {
         id: pallet.id,
@@ -6317,22 +6615,26 @@
         itemIndex: pallet.itemIndex,
         index: 0,
         name: pallet.name,
-        length: baseLength,
-        width: baseWidth,
+        length,
+        width,
         packLength,
         packWidth,
-        actualArea: baseLength * baseWidth,
+        actualArea: originalLength * originalWidth,
         packArea: packLength * packWidth,
         longSide: Math.max(packLength, packWidth),
         shortSide: Math.min(packLength, packWidth),
-        color: pallet.color || "#475569"
+        color: pallet.color || "#475569",
+        originalLength,
+        originalWidth,
+        rotated: !!pallet.rotated,
+        offTrailerSide: dropContext ? dropContext.offTrailerSide : null,
+        x: dropContext ? dropContext.x : null,
+        y: dropContext ? dropContext.y : null,
+        locked: !!pallet.locked
       };
     }
 
-    function buildPlacedFromBufferItem(item, x, y, trailerIndex, plan) {
-      const gap = plan.gap || 0;
-      const length = item.length;
-      const width = item.width;
+    function buildPlacedFromUnplacedPallet(item, x, y, trailerIndex, plan) {
       return {
         id: item.id,
         rowId: item.rowId,
@@ -6341,39 +6643,205 @@
         color: item.color,
         x,
         y,
-        length,
-        width,
-        packLength: length + gap,
-        packWidth: width + gap,
-        originalLength: length,
-        originalWidth: width,
-        rotated: false,
-        area: length * width,
+        length: item.length,
+        width: item.width,
+        packLength: item.packLength,
+        packWidth: item.packWidth,
+        originalLength: item.originalLength,
+        originalWidth: item.originalWidth,
+        rotated: !!item.rotated,
+        area: item.length * item.width,
         trailerIndex,
-        locked: false
+        locked: !!item.locked
       };
+    }
+
+    function collectPreviousUnplacedManualState(plan) {
+      const previousPositions = new Map();
+      if (plan?.unplaced) {
+        for (const item of plan.unplaced) {
+          if (item.offTrailerSide &&
+              Number.isFinite(item.x) &&
+              Number.isFinite(item.y) &&
+              Number.isFinite(item.length) &&
+              Number.isFinite(item.width) &&
+              Number.isFinite(item.packLength) &&
+              Number.isFinite(item.packWidth)) {
+            previousPositions.set(item.id, {
+              offTrailerSide: item.offTrailerSide,
+              x: item.x,
+              y: item.y,
+              rotated: !!item.rotated,
+              length: item.length,
+              width: item.width,
+              packLength: item.packLength,
+              packWidth: item.packWidth,
+              locked: !!item.locked
+            });
+          }
+        }
+      }
+      return {
+        previousPositions,
+        previousZoneWidth: plan?.unplacedZoneWidth ? { ...plan.unplacedZoneWidth } : null
+      };
+    }
+
+    function applyPreviousUnplacedManualState(plan, previousPositions, previousZoneWidth) {
+      if (!plan || !plan.unplaced) return;
+      const isValidPrevious = (prev) =>
+        prev &&
+        (prev.offTrailerSide === "left" || prev.offTrailerSide === "right") &&
+        Number.isFinite(prev.x) &&
+        Number.isFinite(prev.y) &&
+        Number.isFinite(prev.length) &&
+        Number.isFinite(prev.width) &&
+        Number.isFinite(prev.packLength) &&
+        Number.isFinite(prev.packWidth);
+      const applyPrevious = (item, prev) => {
+        item.offTrailerSide = prev.offTrailerSide;
+        item.x = prev.x;
+        item.y = prev.y;
+        item.rotated = !!prev.rotated;
+        item.length = prev.length;
+        item.width = prev.width;
+        item.packLength = prev.packLength;
+        item.packWidth = prev.packWidth;
+        item.locked = !!prev.locked;
+      };
+      const restoredIds = new Set();
+      if (previousPositions && previousPositions.size > 0) {
+        for (const item of plan.unplaced) {
+          const prev = previousPositions.get(item.id);
+          if (!prev) continue;
+          if (!isValidPrevious(prev)) {
+            console.warn("applyPreviousUnplacedManualState: pomijam niepoprawny poprzedni stan", item.id);
+            continue;
+          }
+          applyPrevious(item, prev);
+          restoredIds.add(item.id);
+        }
+        const restoredFromPlaced = [];
+        plan.placed = (plan.placed || []).filter((item) => {
+          const prev = previousPositions.get(item.id);
+          if (!isValidPrevious(prev) || restoredIds.has(item.id)) return true;
+          const unplacedItem = buildUnplacedItemFromPallet(item, plan, {
+            offTrailerSide: prev.offTrailerSide,
+            x: prev.x,
+            y: prev.y
+          });
+          applyPrevious(unplacedItem, prev);
+          restoredFromPlaced.push(unplacedItem);
+          restoredIds.add(item.id);
+          return false;
+        });
+        if (restoredFromPlaced.length > 0) {
+          plan.unplaced.push(...restoredFromPlaced);
+        }
+      }
+      if (previousZoneWidth &&
+          Number.isFinite(previousZoneWidth.left) &&
+          previousZoneWidth.left >= UNPLACED_ZONE_INITIAL_MM &&
+          Number.isFinite(previousZoneWidth.right) &&
+          previousZoneWidth.right >= UNPLACED_ZONE_INITIAL_MM) {
+        plan.unplacedZoneWidth = { ...previousZoneWidth };
+      } else if (!plan.unplacedZoneWidth) {
+        plan.unplacedZoneWidth = { left: UNPLACED_ZONE_INITIAL_MM, right: UNPLACED_ZONE_INITIAL_MM };
+      }
+      normalizePlanForCanvas(plan);
+    }
+
+    function planTrailerGeometryErrors(plan) {
+      return planGeometryErrors(plan, plan.trailer, null);
+    }
+
+    function planUnplacedGeometryErrors(plan) {
+      const errors = [];
+      if (!plan || !plan.unplaced) return errors;
+      for (const pallet of plan.unplaced) {
+        if (pallet.offTrailerSide !== "left" && pallet.offTrailerSide !== "right") {
+          errors.push(`Paleta ${pallet.id} ma nieprawidłowy offTrailerSide: ${pallet.offTrailerSide}`);
+          continue;
+        }
+        if (!Number.isFinite(pallet.x) || !Number.isFinite(pallet.y) || !Number.isFinite(pallet.packLength) || !Number.isFinite(pallet.packWidth)) {
+          errors.push(`Paleta ${pallet.id} ma nieprawidłowe pola pozycji/wymiarów (x/y/packLength/packWidth)`);
+        }
+      }
+      for (const side of ["left", "right"]) {
+        const inSide = plan.unplaced.filter((pallet) =>
+          pallet.offTrailerSide === side &&
+          Number.isFinite(pallet.x) &&
+          Number.isFinite(pallet.y) &&
+          Number.isFinite(pallet.packLength) &&
+          Number.isFinite(pallet.packWidth)
+        );
+        const zoneWidth = plan.unplacedZoneWidth?.[side] || UNPLACED_ZONE_INITIAL_MM;
+        const zoneLength = plan.trailer.length;
+        for (let i = 0; i < inSide.length; i++) {
+          const first = inSide[i];
+          if (first.x < 0 || first.y < 0 || first.x + first.packLength > zoneLength || first.y + first.packWidth > zoneWidth) {
+            errors.push(`Paleta ${first.id} poza obrysem strefy ${side}`);
+          }
+          for (let j = i + 1; j < inSide.length; j++) {
+            const second = inSide[j];
+            if (rectsOverlap(first.x, first.y, first.packLength, first.packWidth, second.x, second.y, second.packLength, second.packWidth)) {
+              errors.push(`Paleta ${first.id} i ${second.id} kolidują w strefie ${side}`);
+            }
+          }
+        }
+      }
+      return errors;
+    }
+
+    function planUnplacedGeometryErrorsStrict(plan) {
+      const errors = [];
+      if (!plan || !plan.unplaced) return errors;
+      for (const pallet of plan.unplaced) {
+        if (!pallet.offTrailerSide && (pallet.x === null || pallet.x === undefined) && (pallet.y === null || pallet.y === undefined)) {
+          continue;
+        }
+        if (pallet.offTrailerSide === "left" || pallet.offTrailerSide === "right") {
+          if (!Number.isFinite(pallet.x) || !Number.isFinite(pallet.y) || !Number.isFinite(pallet.packLength) || !Number.isFinite(pallet.packWidth)) {
+            errors.push(`Paleta ${pallet.id} ma offTrailerSide=${pallet.offTrailerSide} ale nieprawidłowe pola x/y/packLength/packWidth`);
+          }
+          continue;
+        }
+        if (pallet.offTrailerSide && pallet.offTrailerSide !== "left" && pallet.offTrailerSide !== "right") {
+          errors.push(`Paleta ${pallet.id} ma nieprawidłowy offTrailerSide: ${pallet.offTrailerSide}`);
+        }
+        const xSet = pallet.x !== null && pallet.x !== undefined;
+        const ySet = pallet.y !== null && pallet.y !== undefined;
+        if (!pallet.offTrailerSide && (xSet || ySet)) {
+          errors.push(`Paleta ${pallet.id} ma niekanoniczny stan: offTrailerSide=null ale x/y ustawione częściowo lub w pełni`);
+        }
+      }
+      return errors;
     }
 
     function refreshPlanUI() {
       if (!currentPlan) return;
+      const preErrors = planUnplacedGeometryErrorsStrict(currentPlan);
+      if (preErrors.length > 0) {
+        console.warn("Edytor: plan ma uszkodzony kontrakt unplaced.", preErrors);
+        throw new Error("EDITOR_GEOMETRY_INVALID");
+      }
+      normalizePlanForCanvas(currentPlan);
       recomputePlanDerived(currentPlan);
-      const errors = planGeometryErrors(currentPlan, currentPlan.trailer, null);
-      if (errors.length > 0) {
+      const trailerErrors = planTrailerGeometryErrors(currentPlan);
+      const unplacedErrors = planUnplacedGeometryErrors(currentPlan);
+      const errors = { trailer: trailerErrors, unplaced: unplacedErrors };
+      if (trailerErrors.length > 0 || unplacedErrors.length > 0) {
         console.warn("Edytor: plan po edycji jest niepoprawny geometrycznie. Cofam ostatnią operację.", errors);
         throw new Error("EDITOR_GEOMETRY_INVALID");
       }
       updateMetrics(currentPlan);
       renderLegend(currentPlan);
       renderIssues(buildIssues(currentPlan, expandItems(state.rows, currentPlan.gap || state.gap), currentPlan.trailer));
-      renderBuffer(currentPlan);
       drawDeck(currentPlan);
       showEditorOverlay();
     }
 
     function cleanupMoveDrag(redraw = true) {
-      document.removeEventListener("pointermove", onMovingPointerMove);
-      document.removeEventListener("pointerup", onMovingPointerUp);
-      document.removeEventListener("pointercancel", onMovingPointerCancel);
       if (editor.movePointerId !== null) {
         try {
           el.canvas.releasePointerCapture?.(editor.movePointerId);
@@ -6381,80 +6849,69 @@
           // Pointer capture may already be released.
         }
       }
-      editor.mode = "idle";
-      editor.drag = null;
       editor.movePointerId = null;
+      editor.pressOrigin = null;
+      if (editor.mode === "moving") editor.mode = editor.selectedId ? "selected" : "idle";
+      editor.drag = null;
+      editor.snapState = null;
       document.body.style.cursor = "";
       if (redraw && currentPlan) drawDeck(currentPlan);
     }
 
-    function cleanupBufferDrag(redraw = true) {
-      document.removeEventListener("pointermove", onPlacingPointerMove);
-      document.removeEventListener("pointerup", onPlacingPointerUp);
-      document.removeEventListener("pointercancel", onPlacingPointerCancel);
-      if (el.bufferChips) {
-        for (const chip of el.bufferChips.querySelectorAll(".buffer-chip.dragging")) {
-          chip.classList.remove("dragging");
-          if (editor.placingPointerId !== null) {
-            try {
-              chip.releasePointerCapture?.(editor.placingPointerId);
-            } catch {
-              // Pointer capture may already be released.
-            }
-          }
-        }
+    function drawSnapSignal(ctx, layout, snapState) {
+      ctx.save();
+      ctx.strokeStyle = "#0ea5e9";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      if (Number.isFinite(snapState.snapLineX)) {
+        const canvasY = layout.oy + snapState.snapLineX * layout.scale;
+        ctx.beginPath();
+        ctx.moveTo(layout.ox, canvasY);
+        ctx.lineTo(layout.ox + layout.deckW, canvasY);
+        ctx.stroke();
       }
-      if (editor.mode === "placingFromBuffer") editor.mode = "idle";
-      editor.placing = null;
-      editor.placingPointerId = null;
-      if (redraw && currentPlan) drawDeck(currentPlan);
+      if (Number.isFinite(snapState.snapLineY)) {
+        const canvasX = layout.ox + snapState.snapLineY * layout.scale;
+        ctx.beginPath();
+        ctx.moveTo(canvasX, layout.oy);
+        ctx.lineTo(canvasX, layout.oy + layout.deckH);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
     }
 
-    function drawEditorGhost(ctx, layouts, plan) {
-      let ghost = null;
-      if (editor.mode === "moving" && editor.drag) {
-        const pallet = plan.placed?.find((item) => item.id === editor.drag.palletId);
-        const layout = layouts.find((item) => item.index === editor.drag.currentTrailerIndex);
-        if (pallet && layout && editor.drag.currentX !== null && editor.drag.currentY !== null) {
-          ghost = {
-            layout,
-            color: pallet.color,
-            x: editor.drag.currentX,
-            y: editor.drag.currentY,
-            length: pallet.length,
-            width: pallet.width,
-            valid: editor.drag.valid
-          };
-        }
-      } else if (editor.mode === "placingFromBuffer" && editor.placing?.currentTrailerIndex !== null) {
-        const item = editor.placing.itemRef;
-        const layout = layouts.find((candidate) => candidate.index === editor.placing.currentTrailerIndex);
-        if (item && layout && editor.placing.currentX !== null && editor.placing.currentY !== null) {
-          ghost = {
-            layout,
-            color: item.color,
-            x: editor.placing.currentX,
-            y: editor.placing.currentY,
-            length: item.length,
-            width: item.width,
-            valid: editor.placing.valid
-          };
-        }
-      }
-      if (!ghost) return;
-      const gx = ghost.layout.ox + ghost.y * ghost.layout.scale;
-      const gy = ghost.layout.oy + ghost.x * ghost.layout.scale;
-      const gw = ghost.width * ghost.layout.scale;
-      const gh = ghost.length * ghost.layout.scale;
+    function drawMovingGhost(ctx, layouts, plan) {
+      if (editor.mode !== "moving" || !editor.drag) return;
+      const layout = layouts.find((item) => item.key === editor.drag.currentLayoutKey);
+      const pallet = findEditablePallet(editor.drag.palletId);
+      if (!layout || !pallet || !Number.isFinite(editor.drag.currentX) || !Number.isFinite(editor.drag.currentY)) return;
+      const gx = layout.ox + editor.drag.currentY * layout.scale;
+      const gy = layout.oy + editor.drag.currentX * layout.scale;
+      const gw = pallet.width * layout.scale;
+      const gh = pallet.length * layout.scale;
+      const colorMap = {
+        valid: "#16a34a",
+        collision: "#dc2626",
+        outOfTrailer: "#0ea5e9",
+        intoTrailer: "#16a34a",
+        intoOtherUnplacedZone: "#16a34a",
+        outOfCanvas: "#94a3b8",
+        transferDisabledInA2: "#dc2626",
+        invalid: "#dc2626"
+      };
       ctx.save();
       ctx.globalAlpha = 0.5;
-      ctx.fillStyle = ghost.color || "#64748b";
+      ctx.fillStyle = pallet.color || "#64748b";
       ctx.fillRect(gx, gy, gw, gh);
       ctx.globalAlpha = 1;
       ctx.lineWidth = 2;
-      ctx.strokeStyle = ghost.valid ? "#16a34a" : "#dc2626";
+      ctx.strokeStyle = colorMap[editor.drag.dropState] || "#dc2626";
       ctx.strokeRect(gx, gy, gw, gh);
       ctx.restore();
+      if (editor.snapState && editor.snapState.layoutKey === layout.key) {
+        drawSnapSignal(ctx, layout, editor.snapState);
+      }
     }
 
     function drawPallet(ctx, pallet, ds, isHovered) {
@@ -6511,20 +6968,29 @@
       const rect = el.canvas.getBoundingClientRect();
       const px = clientX - rect.left;
       const py = clientY - rect.top;
-
-      for (let i = plan.placed.length - 1; i >= 0; i--) {
+      const renderables = [];
+      for (let i = (plan.placed || []).length - 1; i >= 0; i--) {
         const pallet = plan.placed[i];
-        const layout = drawState.layouts.find((item) => item.index === pallet.trailerIndex);
+        renderables.push({ kind: "placed", pallet, layoutKey: `trailer:${pallet.trailerIndex}` });
+      }
+      for (let i = (plan.unplaced || []).length - 1; i >= 0; i--) {
+        const pallet = plan.unplaced[i];
+        if (pallet.offTrailerSide && Number.isFinite(pallet.x) && Number.isFinite(pallet.y) && Number.isFinite(pallet.packLength) && Number.isFinite(pallet.packWidth)) {
+          renderables.push({ kind: "unplaced", pallet, layoutKey: `unplaced:${pallet.offTrailerSide}` });
+        }
+      }
+      for (const renderable of renderables) {
+        const layout = drawState.layouts.find((item) => item.key === renderable.layoutKey);
         if (!layout) continue;
         const lengthPos = (py - layout.oy) / layout.scale;
         const widthPos = (px - layout.ox) / layout.scale;
         if (
-          lengthPos >= pallet.x &&
-          lengthPos <= pallet.x + pallet.length &&
-          widthPos >= pallet.y &&
-          widthPos <= pallet.y + pallet.width
+          lengthPos >= renderable.pallet.x &&
+          lengthPos <= renderable.pallet.x + renderable.pallet.length &&
+          widthPos >= renderable.pallet.y &&
+          widthPos <= renderable.pallet.y + renderable.pallet.width
         ) {
-          return { pallet, px, py };
+          return { kind: renderable.kind, pallet: renderable.pallet, layoutKey: renderable.layoutKey, layout, px, py };
         }
       }
       return null;
@@ -6541,9 +7007,12 @@
 
       hoveredId = hit.pallet.id;
       const pallet = hit.pallet;
+      const domainLabel = pallet.trailerIndex
+        ? `${escapeHtml(t("trailerLabel"))}: ${formatInt(pallet.trailerIndex || 1)}`
+        : escapeHtml(pallet.offTrailerSide === "left" ? t("unplacedLeft") : t("unplacedRight"));
       el.tooltip.innerHTML = `
         <strong>${escapeHtml(pallet.name)} #${pallet.itemIndex}</strong>
-        ${escapeHtml(t("trailerLabel"))}: ${formatInt(pallet.trailerIndex || 1)}<br>
+        ${domainLabel}<br>
         ${escapeHtml(t("position"))}: ${formatInt(pallet.x)} / ${formatInt(pallet.y)} mm<br>
         ${escapeHtml(t("dimension"))}: ${formatInt(pallet.length)} x ${formatInt(pallet.width)} mm<br>
         ${escapeHtml(t("orientation"))}: ${escapeHtml(pallet.rotated ? t("rotated") : t("base"))}
@@ -6559,241 +7028,338 @@
     }
 
     function onCanvasPointerDown(event) {
-      if (!currentPlan || editor.mode === "moving" || editor.mode === "placingFromBuffer") return;
-      const hit = hitTestPallet(event.clientX, event.clientY);
-
-      if (editor.mode === "armedForMove") {
-        if (!hit || hit.pallet.id !== editor.selectedId) {
-          cleanupMoveDrag();
-          showEditorOverlay();
-          return;
-        }
-        const pallet = currentPlan.placed.find((item) => item.id === editor.selectedId);
-        if (!pallet || pallet.locked) return;
-        editor.mode = "moving";
-        editor.drag = {
-          palletId: pallet.id,
-          originX: pallet.x,
-          originY: pallet.y,
-          originTrailerIndex: pallet.trailerIndex,
-          currentX: pallet.x,
-          currentY: pallet.y,
-          currentTrailerIndex: pallet.trailerIndex,
-          valid: true,
-          wasManuallyEdited: !!currentPlan.manuallyEdited
-        };
-        editor.movePointerId = event.pointerId;
-        try {
-          el.canvas.setPointerCapture?.(event.pointerId);
-        } catch {
-          // Pointer capture is best-effort.
-        }
-        document.addEventListener("pointermove", onMovingPointerMove);
-        document.addEventListener("pointerup", onMovingPointerUp);
-        document.addEventListener("pointercancel", onMovingPointerCancel);
-        document.body.style.cursor = "grabbing";
-        hideTooltipIfVisible();
-        showEditorOverlay();
-        drawDeck(currentPlan);
+      if (!currentPlan || editor.mode === "moving") return;
+      if (editor.pressOrigin && event.pointerId !== editor.pressOrigin.pointerId) {
         event.preventDefault();
         return;
       }
-
+      const hit = hitTestPallet(event.clientX, event.clientY);
       if (!hit) {
         if (editor.selectedId) deselectPallet();
         return;
       }
       selectPalletById(hit.pallet.id);
-      event.preventDefault();
-    }
-
-    function onMovingPointerMove(event) {
-      if (editor.mode !== "moving" || !editor.drag || !currentPlan) return;
-      if (editor.movePointerId !== null && event.pointerId !== editor.movePointerId) return;
-      const rect = el.canvas.getBoundingClientRect();
-      const trailerCtx = getTrailerAtPoint(event.clientX - rect.left, event.clientY - rect.top);
-      const pallet = currentPlan.placed.find((item) => item.id === editor.drag.palletId);
-      if (!pallet || !trailerCtx || trailerCtx.layout.index !== editor.drag.originTrailerIndex) {
-        editor.drag.currentTrailerIndex = editor.drag.originTrailerIndex;
-        editor.drag.currentX = editor.drag.originX;
-        editor.drag.currentY = editor.drag.originY;
-        editor.drag.valid = false;
-        drawDeck(currentPlan);
+      if (hit.pallet.locked) {
         event.preventDefault();
+        event.stopPropagation();
         return;
       }
-
-      const snapX = snapToGrid5(trailerCtx.lengthPos - pallet.length / 2);
-      const snapY = snapToGrid5(trailerCtx.widthPos - pallet.width / 2);
-      editor.drag.currentX = snapX;
-      editor.drag.currentY = snapY;
-      editor.drag.currentTrailerIndex = trailerCtx.layout.index;
-      editor.drag.valid = !wouldCollide({
-        x: snapX,
-        y: snapY,
-        length: pallet.length,
-        width: pallet.width,
-        packLength: pallet.packLength,
-        packWidth: pallet.packWidth,
-        originalLength: pallet.originalLength,
-        originalWidth: pallet.originalWidth,
-        rotated: pallet.rotated,
-        trailerIndex: trailerCtx.layout.index,
-        rowId: pallet.rowId,
-        name: pallet.name,
-        color: pallet.color
-      }, currentPlan, pallet.id);
-      drawDeck(currentPlan);
-      event.preventDefault();
-    }
-
-    function onMovingPointerUp(event) {
-      if (editor.movePointerId !== null && event.pointerId !== editor.movePointerId) return;
-      if (editor.mode === "moving" && editor.drag && currentPlan) {
-        const pallet = currentPlan.placed.find((item) => item.id === editor.drag.palletId);
-        if (pallet && editor.drag.valid) {
-          const snapshot = {
-            x: pallet.x,
-            y: pallet.y,
-            trailerIndex: pallet.trailerIndex,
-            manuallyEdited: editor.drag.wasManuallyEdited
-          };
-          pallet.x = editor.drag.currentX;
-          pallet.y = editor.drag.currentY;
-          pallet.trailerIndex = editor.drag.currentTrailerIndex;
-          markPlanManuallyEdited(currentPlan);
-          try {
-            refreshPlanUI();
-          } catch (err) {
-            pallet.x = snapshot.x;
-            pallet.y = snapshot.y;
-            pallet.trailerIndex = snapshot.trailerIndex;
-            currentPlan.manuallyEdited = snapshot.manuallyEdited;
-            recomputePlanDerived(currentPlan);
-            console.warn("Move cofnięty po walidacji geometrii:", err);
-          }
-        }
-      }
-      cleanupMoveDrag();
-      showEditorOverlay();
-    }
-
-    function onMovingPointerCancel(event) {
-      if (editor.movePointerId !== null && event.pointerId !== editor.movePointerId) return;
-      cleanupMoveDrag();
-      showEditorOverlay();
-    }
-
-    function onBufferChipPointerDown(event) {
-      if (!currentPlan || editor.mode !== "idle") return;
-      const chip = event.target.closest(".buffer-chip");
-      if (!chip) return;
-      const item = (currentPlan.unplaced || []).find((candidate) => candidate.id === chip.dataset.bufferId);
-      if (!item) return;
-      cleanupBufferDrag(false);
-      editor.mode = "placingFromBuffer";
-      editor.placing = {
-        itemRef: item,
-        currentX: null,
-        currentY: null,
-        currentTrailerIndex: null,
-        valid: false,
-        wasManuallyEdited: !!currentPlan.manuallyEdited
+      editor.pressOrigin = {
+        palletId: hit.pallet.id,
+        kind: hit.kind,
+        layoutKey: hit.layoutKey,
+        startX: event.clientX,
+        startY: event.clientY,
+        pointerId: event.pointerId
       };
-      editor.placingPointerId = event.pointerId;
-      chip.classList.add("dragging");
       try {
-        chip.setPointerCapture?.(event.pointerId);
+        el.canvas.setPointerCapture?.(event.pointerId);
       } catch {
         // Pointer capture is best-effort.
       }
-      document.addEventListener("pointermove", onPlacingPointerMove);
-      document.addEventListener("pointerup", onPlacingPointerUp);
-      document.addEventListener("pointercancel", onPlacingPointerCancel);
-      hideTooltipIfVisible();
-      drawDeck(currentPlan);
       event.preventDefault();
+      event.stopPropagation();
     }
 
-    function onPlacingPointerMove(event) {
-      if (editor.mode !== "placingFromBuffer" || !editor.placing || !currentPlan) return;
-      if (editor.placingPointerId !== null && event.pointerId !== editor.placingPointerId) return;
-      const rect = el.canvas.getBoundingClientRect();
-      const trailerCtx = getTrailerAtPoint(event.clientX - rect.left, event.clientY - rect.top);
-      const item = editor.placing.itemRef;
-      if (!trailerCtx || !item) {
-        editor.placing.currentTrailerIndex = null;
-        editor.placing.valid = false;
-        drawDeck(currentPlan);
-        event.preventDefault();
+    function onCanvasPointerMove(event) {
+      if (editor.pressOrigin && editor.pressOrigin.pointerId === event.pointerId && editor.mode !== "moving") {
+        const dx = event.clientX - editor.pressOrigin.startX;
+        const dy = event.clientY - editor.pressOrigin.startY;
+        if (dx * dx + dy * dy >= DRAG_LIFT_THRESHOLD_PX * DRAG_LIFT_THRESHOLD_PX) startMoveDragFromPressOrigin(event);
         return;
       }
-      const snapX = snapToGrid5(trailerCtx.lengthPos - item.length / 2);
-      const snapY = snapToGrid5(trailerCtx.widthPos - item.width / 2);
-      editor.placing.currentX = snapX;
-      editor.placing.currentY = snapY;
-      editor.placing.currentTrailerIndex = trailerCtx.layout.index;
-      editor.placing.valid = !wouldCollide({
-        x: snapX,
-        y: snapY,
-        length: item.length,
-        width: item.width,
-        packLength: item.packLength,
-        packWidth: item.packWidth,
-        originalLength: item.length,
-        originalWidth: item.width,
-        rotated: false,
-        trailerIndex: trailerCtx.layout.index,
-        rowId: item.rowId,
-        name: item.name,
-        color: item.color
-      }, currentPlan, null);
-      drawDeck(currentPlan);
+      if (editor.mode === "moving" && editor.movePointerId === event.pointerId) handleMovingPointerMove(event);
+    }
+
+    function onCanvasPointerUp(event) {
+      if (editor.pressOrigin && editor.pressOrigin.pointerId === event.pointerId) {
+        try { el.canvas.releasePointerCapture?.(event.pointerId); } catch {}
+        editor.pressOrigin = null;
+        return;
+      }
+      if (editor.mode === "moving" && editor.movePointerId === event.pointerId) handleMovingPointerUp(event);
+    }
+
+    function onCanvasPointerCancel(event) {
+      if (editor.pressOrigin && editor.pressOrigin.pointerId === event.pointerId) {
+        try { el.canvas.releasePointerCapture?.(event.pointerId); } catch {}
+        editor.pressOrigin = null;
+        return;
+      }
+      if (editor.mode === "moving" && editor.movePointerId === event.pointerId) {
+        cleanupMoveDrag();
+        drawDeck(currentPlan);
+        showEditorOverlay();
+      }
+    }
+
+    function startMoveDragFromPressOrigin(event) {
+      const origin = editor.pressOrigin;
+      const pallet = findEditablePallet(origin?.palletId);
+      if (!origin || !pallet || pallet.locked) {
+        editor.pressOrigin = null;
+        return;
+      }
+      editor.mode = "moving";
+      editor.drag = {
+        palletId: pallet.id,
+        sourceKind: origin.kind,
+        sourceLayoutKey: origin.layoutKey,
+        originX: pallet.x,
+        originY: pallet.y,
+        originTrailerIndex: pallet.trailerIndex || null,
+        originOffTrailerSide: pallet.offTrailerSide || null,
+        originRotated: pallet.rotated,
+        currentX: pallet.x,
+        currentY: pallet.y,
+        currentLayoutKey: origin.layoutKey,
+        valid: true,
+        dropState: "valid",
+        wasManuallyEdited: !!currentPlan?.manuallyEdited,
+        firstFrameRaw: true
+      };
+      editor.movePointerId = origin.pointerId;
+      editor.pressOrigin = null;
+      document.body.style.cursor = "grabbing";
+      hideTooltipIfVisible();
+      handleMovingPointerMove(event);
       event.preventDefault();
     }
 
-    function onPlacingPointerUp(event) {
-      if (editor.placingPointerId !== null && event.pointerId !== editor.placingPointerId) return;
-      if (editor.mode === "placingFromBuffer" && editor.placing && currentPlan) {
-        const snapshotPlaced = currentPlan.placed.slice();
-        const snapshotUnplaced = (currentPlan.unplaced || []).slice();
-        const snapshotEdited = editor.placing.wasManuallyEdited;
-        if (editor.placing.valid && editor.placing.currentTrailerIndex !== null) {
-          const item = editor.placing.itemRef;
-          const newPallet = buildPlacedFromBufferItem(
-            item,
-            editor.placing.currentX,
-            editor.placing.currentY,
-            editor.placing.currentTrailerIndex,
-            currentPlan
-          );
-          currentPlan.placed.push(newPallet);
-          currentPlan.unplaced = (currentPlan.unplaced || []).filter((candidate) => candidate.id !== item.id);
-          markPlanManuallyEdited(currentPlan);
-          try {
-            refreshPlanUI();
-          } catch (err) {
-            currentPlan.placed = snapshotPlaced;
-            currentPlan.unplaced = snapshotUnplaced;
-            currentPlan.manuallyEdited = snapshotEdited;
-            recomputePlanDerived(currentPlan);
-            console.warn("Insercja z bufora cofnięta po walidacji geometrii:", err);
+    function handleMovingPointerMove(event) {
+      if (editor.mode !== "moving" || !editor.drag || !currentPlan) return;
+      const startTime = performance.now();
+      const rect = el.canvas.getBoundingClientRect();
+      const px = event.clientX - rect.left;
+      const py = event.clientY - rect.top;
+      if (px < 0 || px > rect.width || py < 0 || py > rect.height) {
+        editor.drag.dropState = "outOfCanvas";
+        editor.drag.valid = false;
+        editor.snapState = null;
+        drawDeck(currentPlan);
+        return;
+      }
+      let layoutCtx = getLayoutAtPoint(px, py);
+      if (!layoutCtx) {
+        editor.drag.dropState = "outOfCanvas";
+        editor.drag.valid = false;
+        editor.snapState = null;
+        drawDeck(currentPlan);
+        return;
+      }
+      if (editor.snapState && editor.snapState.layoutKey !== layoutCtx.layout.key) editor.snapState = null;
+      const pallet = findEditablePallet(editor.drag.palletId);
+      if (!pallet) return;
+      if (layoutCtx.layout.kind === "unplaced") {
+        const side = layoutCtx.layout.side;
+        const preSnapGhostY = snapToGrid5(layoutCtx.widthPos - pallet.width / 2);
+        const preSnapEnd = preSnapGhostY + pallet.packWidth;
+        let grew = false;
+        while (preSnapEnd > currentPlan.unplacedZoneWidth[side]) {
+          currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
+          grew = true;
+        }
+        if (grew) {
+          rebuildDrawStateLayouts(currentPlan);
+          const freshCtx = getLayoutAtPoint(px, py);
+          if (!freshCtx) {
+            editor.drag.dropState = "outOfCanvas";
+            editor.drag.valid = false;
+            editor.snapState = null;
+            drawDeck(currentPlan);
+            return;
           }
+          layoutCtx = freshCtx;
         }
       }
-      cleanupBufferDrag();
-      showEditorOverlay();
+      const rawX = snapToGrid5(layoutCtx.lengthPos - pallet.length / 2);
+      const rawY = snapToGrid5(layoutCtx.widthPos - pallet.width / 2);
+      let snappedX = rawX;
+      let snappedY = rawY;
+      let snapInfo = null;
+      if (editor.drag.firstFrameRaw) editor.drag.firstFrameRaw = false;
+      else {
+        const snapResult = applyLiveSnap({ x: rawX, y: rawY, length: pallet.length, width: pallet.width, packLength: pallet.packLength, packWidth: pallet.packWidth }, currentPlan, layoutCtx, pallet.id);
+        snappedX = snapResult.x;
+        snappedY = snapResult.y;
+        snapInfo = snapResult.snapInfo;
+      }
+      if (layoutCtx.layout.kind === "unplaced") {
+        const side = layoutCtx.layout.side;
+        let grewPost = false;
+        while (snappedY + pallet.packWidth > currentPlan.unplacedZoneWidth[side]) {
+          currentPlan.unplacedZoneWidth[side] += UNPLACED_ZONE_GROW_STEP_MM;
+          grewPost = true;
+        }
+        if (grewPost) {
+          rebuildDrawStateLayouts(currentPlan);
+          const freshCtx = getLayoutAtPoint(px, py);
+          if (freshCtx) layoutCtx = freshCtx;
+        }
+      }
+      editor.drag.currentX = snappedX;
+      editor.drag.currentY = snappedY;
+      editor.drag.currentLayoutKey = layoutCtx.layout.key;
+      editor.snapState = snapInfo ? { ...snapInfo, layoutKey: layoutCtx.layout.key } : null;
+      const dropContext = determineDropState(editor.drag, pallet, layoutCtx, currentPlan);
+      editor.drag.dropState = dropContext.state;
+      editor.drag.valid = dropContext.valid;
+      drawDeck(currentPlan);
+      window.__lastMoveLatencyMs = performance.now() - startTime;
+      event.preventDefault();
     }
 
-    function onPlacingPointerCancel(event) {
-      if (editor.placingPointerId !== null && event.pointerId !== editor.placingPointerId) return;
-      cleanupBufferDrag();
+    function applyLiveSnap(candidate, plan, layoutCtx, ignorePalletId) {
+      const result = { x: candidate.x, y: candidate.y, snapInfo: null };
+      const snapX = pickBestCandidate(collectSnapCandidatesX(candidate, plan, layoutCtx, ignorePalletId), candidate.x, editor.snapState?.candidateKeyX || null);
+      const snapY = pickBestCandidate(collectSnapCandidatesY(candidate, plan, layoutCtx, ignorePalletId), candidate.y, editor.snapState?.candidateKeyY || null);
+      const combos = [
+        { x: snapX?.value ?? candidate.x, y: snapY?.value ?? candidate.y, lineX: snapX?.lineCoord, lineY: snapY?.lineCoord, keyX: snapX?.candidateKey, keyY: snapY?.candidateKey },
+        { x: snapX?.value ?? candidate.x, y: candidate.y, lineX: snapX?.lineCoord, lineY: null, keyX: snapX?.candidateKey, keyY: null },
+        { x: candidate.x, y: snapY?.value ?? candidate.y, lineX: null, lineY: snapY?.lineCoord, keyX: null, keyY: snapY?.candidateKey },
+        { x: candidate.x, y: candidate.y, lineX: null, lineY: null, keyX: null, keyY: null }
+      ];
+      for (const combo of combos) {
+        if (!collideWithinLayout(combo.x, combo.y, candidate.length, candidate.width, candidate.packLength, candidate.packWidth, layoutCtx.layout, plan, ignorePalletId)) {
+          result.x = combo.x;
+          result.y = combo.y;
+          result.snapInfo = {
+            snapLineX: Number.isFinite(combo.lineX) ? combo.lineX : null,
+            snapLineY: Number.isFinite(combo.lineY) ? combo.lineY : null,
+            candidateKeyX: combo.keyX,
+            candidateKeyY: combo.keyY
+          };
+          return result;
+        }
+      }
+      return result;
+    }
+
+    function collectSnapCandidatesX(candidate, plan, layoutCtx, ignorePalletId) {
+      const layout = layoutCtx.layout;
+      const wallEnd = layout.length - candidate.packLength;
+      const candidates = [
+        { value: 0, distance: Math.abs(candidate.x), candidateKey: layout.key + ":wall-x0", lineCoord: 0 },
+        { value: wallEnd, distance: Math.abs(candidate.x - wallEnd), candidateKey: layout.key + ":wall-x1", lineCoord: layout.length }
+      ];
+      for (const peer of layoutPeers(plan, layout, ignorePalletId)) {
+        if (!yRangesNear(candidate, peer)) continue;
+        const after = peer.x + peer.packLength;
+        candidates.push({ value: after, distance: Math.abs(candidate.x - after), candidateKey: layout.key + ":peer-" + peer.id + "-x-after", lineCoord: after });
+        const before = peer.x - candidate.packLength;
+        if (before >= 0) candidates.push({ value: before, distance: Math.abs(candidate.x - before), candidateKey: layout.key + ":peer-" + peer.id + "-x-before", lineCoord: peer.x });
+      }
+      const activeKey = editor.snapState?.candidateKeyX || null;
+      return candidates.filter((item) => item.distance <= (item.candidateKey === activeKey ? SNAP_RADIUS_MM + SNAP_HYSTERESIS_MM : SNAP_RADIUS_MM));
+    }
+
+    function collectSnapCandidatesY(candidate, plan, layoutCtx, ignorePalletId) {
+      const layout = layoutCtx.layout;
+      const wallEnd = layout.width - candidate.packWidth;
+      const candidates = [
+        { value: 0, distance: Math.abs(candidate.y), candidateKey: layout.key + ":wall-y0", lineCoord: 0 },
+        { value: wallEnd, distance: Math.abs(candidate.y - wallEnd), candidateKey: layout.key + ":wall-y1", lineCoord: layout.width }
+      ];
+      for (const peer of layoutPeers(plan, layout, ignorePalletId)) {
+        if (!xRangesNear(candidate, peer)) continue;
+        const after = peer.y + peer.packWidth;
+        candidates.push({ value: after, distance: Math.abs(candidate.y - after), candidateKey: layout.key + ":peer-" + peer.id + "-y-after", lineCoord: after });
+        const before = peer.y - candidate.packWidth;
+        if (before >= 0) candidates.push({ value: before, distance: Math.abs(candidate.y - before), candidateKey: layout.key + ":peer-" + peer.id + "-y-before", lineCoord: peer.y });
+      }
+      const activeKey = editor.snapState?.candidateKeyY || null;
+      return candidates.filter((item) => item.distance <= (item.candidateKey === activeKey ? SNAP_RADIUS_MM + SNAP_HYSTERESIS_MM : SNAP_RADIUS_MM));
+    }
+
+    function layoutPeers(plan, layout, ignorePalletId) {
+      if (layout.kind === "trailer") return (plan.placed || []).filter((pallet) => pallet.trailerIndex === layout.index && pallet.id !== ignorePalletId);
+      return (plan.unplaced || []).filter((pallet) => pallet.offTrailerSide === layout.side && pallet.id !== ignorePalletId && Number.isFinite(pallet.x) && Number.isFinite(pallet.y) && Number.isFinite(pallet.packLength) && Number.isFinite(pallet.packWidth));
+    }
+
+    function yRangesNear(a, b) {
+      return !(a.y + a.packWidth + SNAP_RADIUS_MM <= b.y || b.y + b.packWidth + SNAP_RADIUS_MM <= a.y);
+    }
+
+    function xRangesNear(a, b) {
+      return !(a.x + a.packLength + SNAP_RADIUS_MM <= b.x || b.x + b.packLength + SNAP_RADIUS_MM <= a.x);
+    }
+
+    function pickBestCandidate(candidates, currentValue, activeKey) {
+      if (!candidates || candidates.length === 0) return null;
+      if (activeKey) {
+        const active = candidates.find((candidate) => candidate.candidateKey === activeKey);
+        if (active) return active;
+      }
+      return [...candidates].sort((a, b) => a.distance - b.distance)[0];
+    }
+
+    function collideWithinLayout(x, y, length, width, packLength, packWidth, layout, plan, ignorePalletId) {
+      if (x < 0 || y < 0 || x + packLength > layout.length || y + packWidth > layout.width) return true;
+      for (const peer of layoutPeers(plan, layout, ignorePalletId)) {
+        if (rectsOverlap(x, y, packLength, packWidth, peer.x, peer.y, peer.packLength, peer.packWidth)) return true;
+      }
+      return false;
+    }
+
+    function determineDropState(drag, pallet, layoutCtx, plan) {
+      const layout = layoutCtx.layout;
+      const collides = collideWithinLayout(drag.currentX, drag.currentY, pallet.length, pallet.width, pallet.packLength, pallet.packWidth, layout, plan, pallet.id);
+      if (layout.key === drag.sourceLayoutKey) return { state: collides ? "collision" : "valid", valid: !collides };
+      if (drag.sourceKind === "placed" && layout.kind === "trailer" && layout.index !== drag.originTrailerIndex) return { state: "transferDisabledInA2", valid: false };
+      if (drag.sourceKind === "placed" && layout.kind === "unplaced") return { state: collides ? "collision" : "outOfTrailer", valid: !collides };
+      if (drag.sourceKind === "unplaced" && layout.kind === "trailer") return { state: collides ? "collision" : "intoTrailer", valid: !collides };
+      if (drag.sourceKind === "unplaced" && layout.kind === "unplaced") return { state: collides ? "collision" : "intoOtherUnplacedZone", valid: !collides };
+      return { state: "invalid", valid: false };
+    }
+
+    function handleMovingPointerUp(event) {
+      if (editor.mode !== "moving" || !editor.drag) {
+        cleanupMoveDrag();
+        return;
+      }
+      const drag = editor.drag;
+      const pallet = findEditablePallet(drag.palletId);
+      if (!pallet) {
+        cleanupMoveDrag();
+        return;
+      }
+      if (drag.valid && ["valid", "outOfTrailer", "intoTrailer", "intoOtherUnplacedZone"].includes(drag.dropState)) {
+        const snapshot = makeSnapshot(currentPlan);
+        try {
+          if (drag.dropState === "valid") {
+            const target = findEditablePallet(pallet.id);
+            if (target) { target.x = drag.currentX; target.y = drag.currentY; }
+          } else if (drag.dropState === "outOfTrailer") {
+            const layout = drawState.layouts.find((item) => item.key === drag.currentLayoutKey);
+            const newUnplaced = buildUnplacedItemFromPallet(pallet, currentPlan, { offTrailerSide: layout.side, x: drag.currentX, y: drag.currentY });
+            currentPlan.placed = currentPlan.placed.filter((item) => item.id !== pallet.id);
+            currentPlan.unplaced.push(newUnplaced);
+          } else if (drag.dropState === "intoTrailer") {
+            const layout = drawState.layouts.find((item) => item.key === drag.currentLayoutKey);
+            const newPlaced = buildPlacedFromUnplacedPallet(pallet, drag.currentX, drag.currentY, layout.index, currentPlan);
+            currentPlan.unplaced = currentPlan.unplaced.filter((item) => item.id !== pallet.id);
+            currentPlan.placed.push(newPlaced);
+          } else if (drag.dropState === "intoOtherUnplacedZone") {
+            const layout = drawState.layouts.find((item) => item.key === drag.currentLayoutKey);
+            const target = currentPlan.unplaced.find((item) => item.id === pallet.id);
+            if (target) { target.offTrailerSide = layout.side; target.x = drag.currentX; target.y = drag.currentY; }
+          }
+          markPlanManuallyEdited(currentPlan);
+          refreshPlanUI();
+        } catch (err) {
+          restoreSnapshot(currentPlan, snapshot);
+          recomputePlanDerived(currentPlan);
+          drawDeck(currentPlan);
+          console.warn("Drop cofni?ty po walidacji:", err);
+        }
+      }
+      cleanupMoveDrag();
       showEditorOverlay();
     }
 
     function onEditorKeyDown(event) {
       if ((event.key || "").toLowerCase() !== "r") return;
-      if (!editor.selectedId || editor.mode !== "idle") return;
+      if (!editor.selectedId || (editor.mode !== "idle" && editor.mode !== "selected")) return;
       const target = event.target;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       el.editorRotate.click();
@@ -6863,7 +7429,6 @@
             const items = expandItems(state.rows, currentPlan.gap || state.gap);
             renderIssues(buildIssues(currentPlan, items, currentPlan.trailer));
             drawDeck(currentPlan);
-            renderBuffer(currentPlan);
           }
           saveState();
         });
@@ -6892,10 +7457,10 @@
 
       el.recalc.addEventListener("click", () => {
         readGlobalInputs();
-        if (currentPlan?.placed?.some((pallet) => pallet.locked) || currentPlan?.manuallyEdited) {
+        if ([...(currentPlan?.placed || []), ...(currentPlan?.unplaced || [])].some((pallet) => pallet.locked) || currentPlan?.manuallyEdited) {
           const proceed = confirm("Masz ręcznie zedytowany plan (możliwe zablokowane palety). Lock&recompute nie jest jeszcze dostępne — wszystkie palety zostaną przeliczone od zera, flaga „zablokuj” zostanie utracona, edycje zostaną zignorowane. Kontynuować?");
           if (!proceed) return;
-          for (const pallet of currentPlan.placed) pallet.locked = false;
+          for (const pallet of [...(currentPlan.placed || []), ...(currentPlan.unplaced || [])]) pallet.locked = false;
           deselectPallet();
         }
         if (hasCalculated) {
@@ -6910,60 +7475,26 @@
 
       el.print.addEventListener("click", () => window.print());
 
-      el.editorMove.addEventListener("click", () => {
-        if (!editor.selectedId) return;
-        if (editor.mode !== "idle") return;
-        const pallet = currentPlan?.placed?.find((item) => item.id === editor.selectedId);
-        if (!pallet || pallet.locked) return;
-        cleanupMoveDrag(false);
-        editor.mode = "armedForMove";
-        document.body.style.cursor = "grab";
-        hideTooltipIfVisible();
-        showEditorOverlay();
-        drawDeck(currentPlan);
-      });
-
       el.editorRotate.addEventListener("click", () => {
-        if (!editor.selectedId || editor.mode !== "idle") return;
-        const pallet = currentPlan?.placed?.find((item) => item.id === editor.selectedId);
+        if (!editor.selectedId) return;
+        if (editor.mode !== "idle" && editor.mode !== "selected") return;
+        const pallet = findEditablePallet(editor.selectedId);
         if (!pallet || pallet.locked) return;
         const newLength = pallet.width;
         const newWidth = pallet.length;
         const newPackLength = pallet.packWidth;
         const newPackWidth = pallet.packLength;
-        // v1.6.1 hotfix: rotate in place. Re-centering pushed pallets outside bounds near walls.
         const newX = pallet.x;
         const newY = pallet.y;
-        if (wouldCollide({
-          x: newX,
-          y: newY,
-          length: newLength,
-          width: newWidth,
-          packLength: newPackLength,
-          packWidth: newPackWidth,
-          originalLength: pallet.originalLength,
-          originalWidth: pallet.originalWidth,
-          rotated: !pallet.rotated,
-          trailerIndex: pallet.trailerIndex,
-          rowId: pallet.rowId,
-          name: pallet.name,
-          color: pallet.color
-        }, currentPlan, pallet.id)) {
-          el.editorPalletPos.textContent = "Brak miejsca na obrót w tej pozycji";
+        const layoutKey = pallet.trailerIndex ? ("trailer:" + pallet.trailerIndex) : ("unplaced:" + pallet.offTrailerSide);
+        const layout = drawState?.layouts?.find((item) => item.key === layoutKey);
+        if (!layout) return;
+        if (collideWithinLayout(newX, newY, newLength, newWidth, newPackLength, newPackWidth, layout, currentPlan, pallet.id)) {
+          el.editorPalletPos.textContent = t("rotateNoRoom");
           setTimeout(() => showEditorOverlay(), 1800);
           return;
         }
-        const snapshot = {
-          x: pallet.x,
-          y: pallet.y,
-          length: pallet.length,
-          width: pallet.width,
-          packLength: pallet.packLength,
-          packWidth: pallet.packWidth,
-          rotated: pallet.rotated,
-          area: pallet.area,
-          manuallyEdited: !!currentPlan.manuallyEdited
-        };
+        const snapshot = makeSnapshot(currentPlan);
         pallet.x = newX;
         pallet.y = newY;
         pallet.length = newLength;
@@ -6973,70 +7504,72 @@
         pallet.rotated = !pallet.rotated;
         pallet.area = newLength * newWidth;
         markPlanManuallyEdited(currentPlan);
+        editor.snapState = null;
         try {
           refreshPlanUI();
         } catch (err) {
-          Object.assign(pallet, snapshot);
-          currentPlan.manuallyEdited = snapshot.manuallyEdited;
+          restoreSnapshot(currentPlan, snapshot);
           recomputePlanDerived(currentPlan);
           drawDeck(currentPlan);
-          console.warn("Rotate cofnięty po walidacji geometrii:", err);
+          console.warn("Rotate cofni?ty:", err);
         }
       });
 
       el.editorLock.addEventListener("click", () => {
-        if (!editor.selectedId || editor.mode !== "idle") return;
-        const pallet = currentPlan?.placed?.find((item) => item.id === editor.selectedId);
+        if (!editor.selectedId) return;
+        if (editor.mode !== "idle" && editor.mode !== "selected") return;
+        const pallet = findEditablePallet(editor.selectedId);
         if (!pallet) return;
-        const wasManuallyEdited = !!currentPlan.manuallyEdited;
+        const snapshot = makeSnapshot(currentPlan);
         pallet.locked = !pallet.locked;
         markPlanManuallyEdited(currentPlan);
-        const errors = planGeometryErrors(currentPlan, currentPlan.trailer, null);
-        if (errors.length > 0) {
-          pallet.locked = !pallet.locked;
-          currentPlan.manuallyEdited = wasManuallyEdited;
-          console.warn("Lock toggle cofnięty (plan był już invalid):", errors);
-          return;
+        try {
+          showEditorOverlay();
+          drawDeck(currentPlan);
+        } catch (err) {
+          restoreSnapshot(currentPlan, snapshot);
+          drawDeck(currentPlan);
+          console.warn("Lock cofni?ty:", err);
         }
-        showEditorOverlay();
-        drawDeck(currentPlan);
       });
 
       el.editorRemove.addEventListener("click", () => {
-        if (!editor.selectedId || editor.mode !== "idle") return;
-        const pallet = currentPlan?.placed?.find((item) => item.id === editor.selectedId);
+        if (!editor.selectedId) return;
+        if (editor.mode !== "idle" && editor.mode !== "selected") return;
+        const pallet = findEditablePallet(editor.selectedId);
         if (!pallet || pallet.locked) return;
-        const snapshotPlaced = currentPlan.placed.slice();
-        const snapshotUnplaced = (currentPlan.unplaced || []).slice();
-        const snapshotEdited = !!currentPlan.manuallyEdited;
-        const snapshotSelected = editor.selectedId;
-        const unplacedItem = buildUnplacedItemFromPallet(pallet, currentPlan);
+        if (!pallet.trailerIndex) return;
+        const snapshot = makeSnapshot(currentPlan);
+        const editorSnapshot = { selectedId: editor.selectedId, mode: editor.mode };
+        const unplacedItem = buildUnplacedItemFromPallet(pallet, currentPlan, null);
         currentPlan.placed = currentPlan.placed.filter((item) => item.id !== pallet.id);
-        currentPlan.unplaced = (currentPlan.unplaced || []).concat([unplacedItem]);
+        currentPlan.unplaced.push(unplacedItem);
         markPlanManuallyEdited(currentPlan);
         try {
-          deselectPallet();
+          normalizePlanForCanvas(currentPlan);
           refreshPlanUI();
+          deselectPallet();
         } catch (err) {
-          currentPlan.placed = snapshotPlaced;
-          currentPlan.unplaced = snapshotUnplaced;
-          currentPlan.manuallyEdited = snapshotEdited;
-          editor.selectedId = snapshotSelected;
+          restoreSnapshot(currentPlan, snapshot);
+          editor.selectedId = editorSnapshot.selectedId;
+          editor.mode = editorSnapshot.mode;
           recomputePlanDerived(currentPlan);
           drawDeck(currentPlan);
           showEditorOverlay();
-          console.warn("Usuń cofnięty po walidacji geometrii:", err);
+          console.warn("Usu? cofni?ty:", err);
         }
       });
 
       el.editorClose.addEventListener("click", () => deselectPallet());
-      el.bufferChips.addEventListener("pointerdown", onBufferChipPointerDown);
       el.canvas.addEventListener("pointerdown", onCanvasPointerDown);
+      el.canvas.addEventListener("pointermove", onCanvasPointerMove);
+      el.canvas.addEventListener("pointerup", onCanvasPointerUp);
+      el.canvas.addEventListener("pointercancel", onCanvasPointerCancel);
       window.addEventListener("keydown", onEditorKeyDown);
 
       el.canvas.addEventListener("mousemove", (event) => {
-        if (editor.mode !== "idle") {
-          hideTooltipIfVisible();
+        if (editor.mode !== "idle" && editor.mode !== "selected") {
+          if (hoveredId !== null) showTooltip(null);
           return;
         }
         showTooltip(hitTestPallet(event.clientX, event.clientY));
@@ -7048,7 +7581,8 @@
       let panStartX = 0;
       let panStartScrollLeft = 0;
       el.canvasShell.addEventListener("pointerdown", (event) => {
-        if (editor.mode === "moving" || editor.mode === "placingFromBuffer") return;
+        if (editor.mode === "moving") return;
+        if (editor.pressOrigin) return;
         if (event.pointerType !== "mouse" || event.button !== 0) return;
         if (el.canvasShell.scrollWidth <= el.canvasShell.clientWidth) return;
         isCanvasPanning = true;
@@ -7081,7 +7615,6 @@
         const plan = displayedPlan || currentPlan;
         if (plan) {
           drawDeck(plan);
-          renderBuffer(plan);
         }
       });
     }
@@ -7099,6 +7632,14 @@
         getEditor: () => editor,
         getDrawState: () => drawState,
         geometryErrors: (plan = currentPlan) => plan ? planGeometryErrors(plan, plan.trailer, null) : [],
+        trailerErrors: (plan = currentPlan) => plan ? planTrailerGeometryErrors(plan) : [],
+        unplacedErrors: (plan = currentPlan) => plan ? planUnplacedGeometryErrors(plan) : [],
+        strictUnplacedErrors: (plan = currentPlan) => plan ? planUnplacedGeometryErrorsStrict(plan) : [],
+        normalizePlanForCanvas,
+        refreshPlanUI,
+        selectPalletById,
+        deselectPallet,
+        findEditablePallet,
         recalc: calculateAndRender,
         resetVariant: resetLayoutVariant
       };
