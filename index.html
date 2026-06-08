@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LoadPallet v1.7.2</title>
+  <title>LoadPallet v1.7.3</title>
   <link rel="icon" href="data:,">
   <style>
     :root {
@@ -643,7 +643,6 @@
       width: 100%;
       min-width: 100%;
       height: 460px;
-      touch-action: none;
     }
 
     .tooltip {
@@ -1196,7 +1195,6 @@
 
       canvas {
         height: 300px;
-        touch-action: none;
       }
 
       .loads-footer {
@@ -1221,7 +1219,7 @@
     <div class="header-inner">
       <div class="brand">
         <div class="header-topline">
-          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.7.2</span></h1>
+          <h1><span id="appTitleText">LoadPallet</span> <span id="appVersion" class="app-version">v1.7.3</span></h1>
           <select id="languageSelect" class="language-select" aria-label="Język">
             <option value="pl">Polski</option>
             <option value="en">English</option>
@@ -1436,7 +1434,7 @@
   <script>
     const STORAGE_KEY = "rozkladPalet.v3";
     const APP_VERSION = "2026-06-05.14";
-    const APP_DISPLAY_VERSION = "v1.7.2";
+    const APP_DISPLAY_VERSION = "v1.7.3";
     const DEFAULT_GAP = 10;
     const GAP_DEFAULT_VERSION = 2;
 
@@ -7065,16 +7063,12 @@
 
     function onCanvasPointerMove(event) {
       if (editor.pressOrigin && editor.pressOrigin.pointerId === event.pointerId && editor.mode !== "moving") {
-        event.preventDefault();
         const dx = event.clientX - editor.pressOrigin.startX;
         const dy = event.clientY - editor.pressOrigin.startY;
         if (dx * dx + dy * dy >= DRAG_LIFT_THRESHOLD_PX * DRAG_LIFT_THRESHOLD_PX) startMoveDragFromPressOrigin(event);
         return;
       }
-      if (editor.mode === "moving" && editor.movePointerId === event.pointerId) {
-        event.preventDefault();
-        handleMovingPointerMove(event);
-      }
+      if (editor.mode === "moving" && editor.movePointerId === event.pointerId) handleMovingPointerMove(event);
     }
 
     function onCanvasPointerUp(event) {
